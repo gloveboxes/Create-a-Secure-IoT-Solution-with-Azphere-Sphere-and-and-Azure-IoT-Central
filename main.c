@@ -2,6 +2,8 @@
 #include <errno.h>
 #include <string.h>
 #include <time.h>
+#include <signal.h>
+#include <stdio.h>
 
 #include <applibs/log.h>
 #include <applibs/gpio.h>
@@ -18,10 +20,9 @@
 #include <iothub.h>
 #include <azure_sphere_provisioning.h>
 
-#include <stdio.h>
 #include <applibs/networking.h>
 #include "epoll_timerfd_utilities.h"
-#include <signal.h>
+
 
 static volatile sig_atomic_t terminationRequired = false;
 
@@ -97,7 +98,7 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-static int measure(char eventBuffer[], int len) {
+static int measure(char eventBuffer[], size_t len) {
 	GroveTempHumiSHT31_Read(sht31);
 	float temperature = GroveTempHumiSHT31_GetTemperature(sht31);
 	float humidity = GroveTempHumiSHT31_GetHumidity(sht31);
