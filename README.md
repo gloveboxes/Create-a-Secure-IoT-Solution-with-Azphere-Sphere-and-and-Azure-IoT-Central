@@ -170,6 +170,7 @@ static IOTHUB_DEVICE_CLIENT_LL_HANDLE iothubClientHandle = NULL;
 static const int keepalivePeriodSeconds = 20;
 static bool iothubAuthenticated = false;
 
+static void TerminationHandler(int);
 static void SendTelemetry(void);
 static void SetupAzureClient(void);
 static void SendMessageCallback(IOTHUB_CLIENT_CONFIRMATION_RESULT result, void* context);
@@ -233,37 +234,25 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-/// <summary>
-/// Azure timer event:  Check connection status and send telemetry
-/// </summary>
-static void AzureTimerEventHandler(EventData* eventData)
-{
-	if (ConsumeTimerFdEvent(azureTimerFd) != 0) {
-		terminationRequired = true;
-		return;
-	}
+static int measure(char eventBuffer[], int len) {
+	GroveTempHumiSHT31_Read(sht31);
+	float temperature = GroveTempHumiSHT31_GetTemperature(sht31);
+	float humidity = GroveTempHumiSHT31_GetHumidity(sht31);
 
-	bool isNetworkReady = false;
-	if (Networking_IsNetworkingReady(&isNetworkReady) != -1) {
-		if (isNetworkReady && !iothubAuthenticated) {
-			SetupAzureClient();
-		}
-	}
-	else {
-		Log_Debug("Failed to get Network state\n");
-	}
-
-	if (iothubAuthenticated) {
-		SendTelemetry();
-		IoTHubDeviceClient_LL_DoWork(iothubClientHandle);
-	}
+	static const char* EventMsgTemplate = "{ \"Temperature\": \"%3.2f\", \"Humidity\": \"%3.1f\" }";
+	return snprintf(eventBuffer, len, EventMsgTemplate, temperature, humidity);
 }
 
-static void TerminationHandler(int signalNumber)
-{
-	// Don't use Log_Debug here, as it is not guaranteed to be async-signal-safe.
-	terminationRequired = true;
+
+static void preSendTelemtry(void) {
+	GPIO_SetValue(blinkOnSendGpioFd, GPIO_Value_Low);
 }
+
+
+static void postSendTelemetry(void) {
+	GPIO_SetValue(blinkOnSendGpioFd, GPIO_Value_High);
+}
+
 
 /// <summary>
 ///     Set up SIGTERM termination handler, initialize peripherals, and set up event handlers.
@@ -322,15 +311,11 @@ static void ClosePeripheralsAndHandlers(void)
 /// </summary>
 static void SendTelemetry(void)
 {
-	GPIO_SetValue(blinkOnSendGpioFd, GPIO_Value_Low);
-
-	GroveTempHumiSHT31_Read(sht31);
-	float temperature = GroveTempHumiSHT31_GetTemperature(sht31);
-	float humidity = GroveTempHumiSHT31_GetHumidity(sht31);
+	preSendTelemtry();
 
 	static char eventBuffer[100] = { 0 };
-	static const char* EventMsgTemplate = "{ \"Temperature\": \"%3.2f\", \"Humidity\": \"%3.1f\" }";
-	int len = snprintf(eventBuffer, sizeof(eventBuffer), EventMsgTemplate, temperature, humidity);
+
+	int len = measure(eventBuffer, sizeof(eventBuffer));
 
 	if (len < 0)
 		return;
@@ -354,8 +339,41 @@ static void SendTelemetry(void)
 
 	IoTHubMessage_Destroy(messageHandle);
 
-	GPIO_SetValue(blinkOnSendGpioFd, GPIO_Value_High);
+	postSendTelemetry();
 }
+
+/// <summary>
+/// Azure timer event:  Check connection status and send telemetry
+/// </summary>
+static void AzureTimerEventHandler(EventData* eventData)
+{
+	if (ConsumeTimerFdEvent(azureTimerFd) != 0) {
+		terminationRequired = true;
+		return;
+	}
+
+	bool isNetworkReady = false;
+	if (Networking_IsNetworkingReady(&isNetworkReady) != -1) {
+		if (isNetworkReady && !iothubAuthenticated) {
+			SetupAzureClient();
+		}
+	}
+	else {
+		Log_Debug("Failed to get Network state\n");
+	}
+
+	if (iothubAuthenticated) {
+		SendTelemetry();
+		IoTHubDeviceClient_LL_DoWork(iothubClientHandle);
+	}
+}
+
+static void TerminationHandler(int signalNumber)
+{
+	// Don't use Log_Debug here, as it is not guaranteed to be async-signal-safe.
+	terminationRequired = true;
+}
+
 
 /// <summary>
 ///     Callback confirming message delivered to IoT Hub.
