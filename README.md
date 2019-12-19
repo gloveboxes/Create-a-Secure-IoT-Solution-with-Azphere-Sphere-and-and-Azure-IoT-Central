@@ -257,6 +257,8 @@ Clone the tutorial sample.
 
 ## Understanding the main.c Code
 
+Note, this is a simplified implementation of the 
+
 From Visual Studio, open the main.c file.
 
 Review the following functions.
