@@ -26,6 +26,10 @@
 
 static volatile sig_atomic_t terminationRequired = false;
 
+// Number of bytes to allocate for the JSON telemetry message for IoT Central
+#define JSON_MESSAGE_BYTES 100
+
+
 // Azure IoT Hub/Central defines.
 #define SCOPEID_LENGTH 20
 static char scopeId[SCOPEID_LENGTH]; // ScopeId for the Azure IoT Central application, set in app_manifest.json, CmdArgs
@@ -50,9 +54,13 @@ static void ClosePeripheralsAndHandlers(void);
 static void AzureTimerEventHandler(EventData* eventData);
 static EventData azureEventData = { .eventHandler = &AzureTimerEventHandler };
 
+static void AzureDoWorkTimerEventHandler(EventData* eventData);
+static EventData azureEventDoWork = { .eventHandler = &AzureDoWorkTimerEventHandler };
+
 // Timer / polling
 static int azureTimerFd = -1;
 static int epollFd = -1;
+static int azureIotDoWork = -1;
 
 // Azure IoT poll periods
 static const int AzureIoTDefaultPollPeriodSeconds = 5;
@@ -98,7 +106,10 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-static int measure(char eventBuffer[], size_t len) {
+/// <summary>
+///     Reads telemetry and returns the data as a JSON object.
+/// </summary>
+static int ReadTelemetry(char eventBuffer[], size_t len) {
 	GroveTempHumiSHT31_Read(sht31);
 	float temperature = GroveTempHumiSHT31_GetTemperature(sht31);
 	float humidity = GroveTempHumiSHT31_GetHumidity(sht31);
@@ -156,6 +167,13 @@ static int InitPeripheralsAndHandlers(void)
 		return -1;
 	}
 
+	struct timespec azureDoWorkPeriod = { 1, 0 };
+
+	azureIotDoWork = CreateTimerFdAndAddToEpoll(epollFd, &azureDoWorkPeriod, &azureEventDoWork, EPOLLIN);
+	if (azureIotDoWork < 0) {
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -177,9 +195,9 @@ static void SendTelemetry(void)
 {
 	preSendTelemtry();
 
-	static char eventBuffer[100] = { 0 };
+	static char eventBuffer[JSON_MESSAGE_BYTES] = { 0 };
 
-	int len = measure(eventBuffer, sizeof(eventBuffer));
+	int len = ReadTelemetry(eventBuffer, sizeof(eventBuffer));
 
 	if (len < 0)
 		return;
@@ -204,6 +222,13 @@ static void SendTelemetry(void)
 	IoTHubMessage_Destroy(messageHandle);
 
 	postSendTelemetry();
+}
+
+static void AzureDoWorkTimerEventHandler(EventData* eventData) {
+	if (iothubClientHandle != NULL) {
+		IoTHubDeviceClient_LL_DoWork(iothubClientHandle);
+		//Log_Debug("do work");
+	}
 }
 
 /// <summary>
@@ -259,6 +284,22 @@ static void HubConnectionStatusCallback(IOTHUB_CLIENT_CONNECTION_STATUS result, 
 	Log_Debug("IoT Hub Authenticated: %s\n", GetReasonString(reason));
 }
 
+
+static void CommandCollector(const char* method_name, const unsigned char* payload, size_t size,
+	unsigned char** response, size_t* response_size, void* userContextCallback) {
+
+	(void)userContextCallback;
+	(void)payload;
+	(void)size;
+
+	int result;
+
+	Log_Debug("Direct method %s\n", method_name);
+
+	return 200;
+
+}
+
 /// <summary>
 ///     Sets up the Azure IoT Hub connection (creates the iothubClientHandle)
 ///     When the SAS Token for a device expires the connection needs to be recreated
@@ -309,7 +350,10 @@ static void SetupAzureClient(void)
 
 	//IoTHubDeviceClient_LL_SetDeviceTwinCallback(iothubClientHandle, TwinCallback, NULL);
 	IoTHubDeviceClient_LL_SetConnectionStatusCallback(iothubClientHandle, HubConnectionStatusCallback, NULL);
+	IoTHubDeviceClient_LL_SetDeviceMethodCallback(iothubClientHandle, CommandCollector, NULL);
 }
+
+
 
 /// <summary>
 ///     Converts AZURE_SPHERE_PROV_RETURN_VALUE to a string.
