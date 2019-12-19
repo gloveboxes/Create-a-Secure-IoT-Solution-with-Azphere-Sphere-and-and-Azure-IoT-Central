@@ -70,6 +70,7 @@ static const int AzureIoTMaxReconnectPeriodSeconds = 10 * 60;
 static int azureIoTPollPeriodSeconds = -1;
 
 static int blinkOnSendGpioFd = -1;
+static int ledDirectMethodGpioFd = -1;
 static int i2cFd;
 static void* sht31;
 
@@ -148,6 +149,15 @@ static int InitPeripheralsAndHandlers(void)
 	// Change this GPIO number and the number in app_manifest.json if required by your hardware.
 	blinkOnSendGpioFd = GPIO_OpenAsOutput(9, GPIO_OutputMode_PushPull, GPIO_Value_High);
 	if (blinkOnSendGpioFd < 0) {
+		Log_Debug(
+			"Error opening GPIO: %s (%d). Check that app_manifest.json includes the GPIO used.\n",
+			strerror(errno), errno);
+		return -1;
+	}
+
+	// Change this GPIO number and the number in app_manifest.json if required by your hardware.
+	ledDirectMethodGpioFd = GPIO_OpenAsOutput(15, GPIO_OutputMode_PushPull, GPIO_Value_High);
+	if (ledDirectMethodGpioFd < 0) {
 		Log_Debug(
 			"Error opening GPIO: %s (%d). Check that app_manifest.json includes the GPIO used.\n",
 			strerror(errno), errno);
@@ -284,25 +294,6 @@ static void HubConnectionStatusCallback(IOTHUB_CLIENT_CONNECTION_STATUS result, 
 	Log_Debug("IoT Hub Authenticated: %s\n", GetReasonString(reason));
 }
 
-/// <summary>
-///     Allocates and formats a string message on the heap.
-/// </summary>
-/// <param name="messageFormat">The format of the message</param>
-/// <param name="maxLength">The maximum length of the formatted message string</param>
-/// <returns>The pointer to the heap allocated memory.</returns>
-static void* SetupHeapMessage(const char* messageFormat, size_t maxLength, ...)
-{
-	va_list args;
-	va_start(args, maxLength);
-	char* message =
-		malloc(maxLength + 1); // Ensure there is space for the null terminator put by vsnprintf.
-	if (message != NULL) {
-		vsnprintf(message, maxLength, messageFormat, args);
-	}
-	va_end(args);
-	return message;
-}
-
 
 static void CommandCollector(const char* method_name, const unsigned char* payload, size_t size,
 	unsigned char** responsePayload, size_t* responsePayloadSize, void* userContextCallback) {
@@ -312,24 +303,6 @@ static void CommandCollector(const char* method_name, const unsigned char* paylo
 	*responsePayload = NULL;  // Response payload content.
 	*responsePayloadSize = 0; // Response payload content size.
 
-	//int result = 404; // HTTP status code.
-	//char x;
-	//char* onoffStr = &x;
-
-	//		// Response
-	//static const char groveOkResponse[] = "{ \"success\" : true, \"message\" : \"status %s\" }";
-	//size_t responseMaxLength = sizeof(groveOkResponse) + strlen(payload);
-	//*responsePayload = SetupHeapMessage(groveOkResponse, responseMaxLength, onoffStr);
-	//if (*responsePayload == NULL) {
-	//	Log_Debug("ERROR: Could not allocate buffer for direct method response payload.\n");
-	//	abort();
-	//}
-	//*responsePayloadSize = strlen(*responsePayload);
-
-	//Log_Debug("Direct method %s\n", method_name);
-
-	//return 200;
-
 	const char* onSuccess = "\"Successfully invoke device method\"";
 	const char* notFound = "\"No method found\"";
 
@@ -338,13 +311,11 @@ static void CommandCollector(const char* method_name, const unsigned char* paylo
 
 	if (strcmp(method_name, "lighton") == 0)
 	{
-		//start();
-		Log_Debug("LightOn");
+		GPIO_SetValue(ledDirectMethodGpioFd, GPIO_Value_Low);
 	}
 	else if (strcmp(method_name, "lightoff") == 0)
 	{
-		//stop();
-		Log_Debug("LightOff");
+		GPIO_SetValue(ledDirectMethodGpioFd, GPIO_Value_High);
 	}
 	else
 	{
