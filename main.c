@@ -284,19 +284,80 @@ static void HubConnectionStatusCallback(IOTHUB_CLIENT_CONNECTION_STATUS result, 
 	Log_Debug("IoT Hub Authenticated: %s\n", GetReasonString(reason));
 }
 
+/// <summary>
+///     Allocates and formats a string message on the heap.
+/// </summary>
+/// <param name="messageFormat">The format of the message</param>
+/// <param name="maxLength">The maximum length of the formatted message string</param>
+/// <returns>The pointer to the heap allocated memory.</returns>
+static void* SetupHeapMessage(const char* messageFormat, size_t maxLength, ...)
+{
+	va_list args;
+	va_start(args, maxLength);
+	char* message =
+		malloc(maxLength + 1); // Ensure there is space for the null terminator put by vsnprintf.
+	if (message != NULL) {
+		vsnprintf(message, maxLength, messageFormat, args);
+	}
+	va_end(args);
+	return message;
+}
+
 
 static void CommandCollector(const char* method_name, const unsigned char* payload, size_t size,
-	unsigned char** response, size_t* response_size, void* userContextCallback) {
+	unsigned char** responsePayload, size_t* responsePayloadSize, void* userContextCallback) {
 
-	(void)userContextCallback;
-	(void)payload;
-	(void)size;
+	// Prepare the payload for the response. This is a heap allocated null terminated string.
+	// The Azure IoT Hub SDK is responsible of freeing it.
+	*responsePayload = NULL;  // Response payload content.
+	*responsePayloadSize = 0; // Response payload content size.
 
-	int result;
+	//int result = 404; // HTTP status code.
+	//char x;
+	//char* onoffStr = &x;
 
-	Log_Debug("Direct method %s\n", method_name);
+	//		// Response
+	//static const char groveOkResponse[] = "{ \"success\" : true, \"message\" : \"status %s\" }";
+	//size_t responseMaxLength = sizeof(groveOkResponse) + strlen(payload);
+	//*responsePayload = SetupHeapMessage(groveOkResponse, responseMaxLength, onoffStr);
+	//if (*responsePayload == NULL) {
+	//	Log_Debug("ERROR: Could not allocate buffer for direct method response payload.\n");
+	//	abort();
+	//}
+	//*responsePayloadSize = strlen(*responsePayload);
 
-	return 200;
+	//Log_Debug("Direct method %s\n", method_name);
+
+	//return 200;
+
+	const char* onSuccess = "\"Successfully invoke device method\"";
+	const char* notFound = "\"No method found\"";
+
+	const char* responseMessage = onSuccess;
+	int result = 200;
+
+	if (strcmp(method_name, "lighton") == 0)
+	{
+		//start();
+		Log_Debug("LightOn");
+	}
+	else if (strcmp(method_name, "lightoff") == 0)
+	{
+		//stop();
+		Log_Debug("LightOff");
+	}
+	else
+	{
+
+		responseMessage = notFound;
+		result = 404;
+	}
+
+	*responsePayloadSize = strlen(responseMessage);
+	*responsePayload = (unsigned char*)malloc(*responsePayloadSize);
+	strncpy((char*)(*responsePayload), responseMessage, *responsePayloadSize);
+
+	return result;
 
 }
 
