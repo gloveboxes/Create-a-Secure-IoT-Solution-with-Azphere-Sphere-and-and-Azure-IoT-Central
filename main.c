@@ -259,6 +259,21 @@ cleanup:
 }
 
 
+static void SetDesiredState(JSON_Object* desiredProperties, Peripheral* peripheral) {
+	JSON_Object* jsonObject = json_object_dotget_object(desiredProperties, peripheral->twinProperty);
+	if (jsonObject != NULL) {
+		peripheral->twinState = (bool)json_object_get_boolean(jsonObject, "value");
+		if (peripheral->invertPin) {
+			GPIO_SetValue(peripheral->fd, (peripheral->twinState == true ? GPIO_Value_Low : GPIO_Value_High));
+		}
+		else {
+			GPIO_SetValue(peripheral->fd, (peripheral->twinState == true ? GPIO_Value_High : GPIO_Value_Low));
+		}
+		TwinReportState(peripheral->twinProperty, peripheral->twinState);
+	}
+}
+
+
 static int AzureDirectMethodHandler(const char* method_name, const unsigned char* payload, size_t payloadSize,
 	unsigned char** responsePayload, size_t* responsePayloadSize, void* userContextCallback) {
 
@@ -298,7 +313,8 @@ static int AzureDirectMethodHandler(const char* method_name, const unsigned char
 		result = 500;
 		goto cleanup;
 	}
-	else if (strcmp(method_name, "fanspeed") == 0)
+
+	if (strcmp(method_name, "fanspeed") == 0)
 	{
 		int speed = (int)json_object_get_number(root_object, "speed");
 		Log_Debug("Set fan speed %d", speed);
@@ -327,19 +343,6 @@ cleanup:
 
 
 
-static void SetDesiredState(JSON_Object* desiredProperties, Peripheral * peripheral) {
-	JSON_Object* jsonObject = json_object_dotget_object(desiredProperties, peripheral->twinProperty);
-	if (jsonObject != NULL) {
-		peripheral->twinState = (bool)json_object_get_boolean(jsonObject, "value");
-		if (peripheral->invertPin) {
-			GPIO_SetValue(peripheral->fd, (peripheral->twinState == true ? GPIO_Value_Low : GPIO_Value_High));
-		}
-		else {
-			GPIO_SetValue(peripheral->fd, (peripheral->twinState == true ? GPIO_Value_High : GPIO_Value_Low));
-		}
-		TwinReportState(peripheral->twinProperty, peripheral->twinState);
-	}
-}
 
 
 /// <summary>
@@ -349,6 +352,7 @@ static void ReportStatusCallback(int result, void* context)
 {
 	Log_Debug("INFO: Device Twin reported properties update result: HTTP status code %d\n", result);
 }
+
 
 static void TwinReportState(const char* propertyName, bool propertyValue)
 {
@@ -520,8 +524,9 @@ static void SetupAzureClient(void)
 	}
 
 	IoTHubDeviceClient_LL_SetDeviceTwinCallback(iothubClientHandle, TwinCallback, NULL);
-	IoTHubDeviceClient_LL_SetConnectionStatusCallback(iothubClientHandle, HubConnectionStatusCallback, NULL);
 	IoTHubDeviceClient_LL_SetDeviceMethodCallback(iothubClientHandle, AzureDirectMethodHandler, NULL);
+	IoTHubDeviceClient_LL_SetConnectionStatusCallback(iothubClientHandle, HubConnectionStatusCallback, NULL);
+	
 }
 
 
