@@ -23,6 +23,8 @@
 #include <applibs/networking.h>
 #include "epoll_timerfd_utilities.h"
 
+#include "parson.h"
+
 
 static volatile sig_atomic_t terminationRequired = false;
 
@@ -60,14 +62,14 @@ static EventData azureEventDoWork = { .eventHandler = &AzureDoWorkTimerEventHand
 // Timer / polling
 static int azureTimerFd = -1;
 static int epollFd = -1;
-static int azureIotDoWork = -1;
+static int azureIotDoWorkTimerFd = -1;
 
 // Azure IoT poll periods
 static const int AzureIoTDefaultPollPeriodSeconds = 5;
 static const int AzureIoTMinReconnectPeriodSeconds = 60;
 static const int AzureIoTMaxReconnectPeriodSeconds = 10 * 60;
 
-static int azureIoTPollPeriodSeconds = -1;
+static int azureIoTPollPeriodSeconds = 1;
 
 static int blinkOnSendGpioFd = -1;
 static int ledDirectMethodGpioFd = -1;
@@ -177,10 +179,10 @@ static int InitPeripheralsAndHandlers(void)
 		return -1;
 	}
 
+	// periodic timer to call IoTHubDeviceClient_LL_DoWork
 	struct timespec azureDoWorkPeriod = { 1, 0 };
-
-	azureIotDoWork = CreateTimerFdAndAddToEpoll(epollFd, &azureDoWorkPeriod, &azureEventDoWork, EPOLLIN);
-	if (azureIotDoWork < 0) {
+	azureIotDoWorkTimerFd = CreateTimerFdAndAddToEpoll(epollFd, &azureDoWorkPeriod, &azureEventDoWork, EPOLLIN);
+	if (azureIotDoWorkTimerFd < 0) {
 		return -1;
 	}
 
@@ -196,6 +198,84 @@ static void ClosePeripheralsAndHandlers(void)
 	CloseFdAndPrintError(blinkOnSendGpioFd, "SendBlinker");
 	CloseFdAndPrintError(azureTimerFd, "AzureTimer");
 	CloseFdAndPrintError(epollFd, "Epoll");
+}
+
+
+static void DirectMethodProcessor(const char* method_name, const unsigned char* payload, size_t payloadSize,
+	unsigned char** responsePayload, size_t* responsePayloadSize, void* userContextCallback) {
+
+
+	const char* onSuccess = "\"Successfully invoke device method\"";
+	const char* notFound = "\"No method found\"";
+
+	const char* responseMessage = onSuccess;
+	int result = 200;
+	JSON_Value* root_value = NULL;
+	JSON_Object* root_object = NULL;
+
+	// Prepare the payload for the response. This is a heap allocated null terminated string.
+	// The Azure IoT Hub SDK is responsible of freeing it.
+	*responsePayload = NULL;  // Response payload content.
+	*responsePayloadSize = 0; // Response payload content size.
+
+	char* payLoadString = (char*)malloc(payloadSize + 1);
+	if (payLoadString == NULL) {
+		responseMessage = "payload memory failed";
+		result = 500;
+		goto cleanup;
+	}
+
+	memcpy(payLoadString, payload, payloadSize);
+	payLoadString[payloadSize] = 0; //null terminate string
+
+	root_value = json_parse_string(payLoadString);
+	if (root_value == NULL) {
+		responseMessage = "Invalid JSON";
+		result =  500;
+		goto cleanup;
+	}
+
+	root_object = json_value_get_object(root_value);
+	if (root_object == NULL) {
+		responseMessage = "Invalid JSON";
+		result = 500;
+		goto cleanup;
+	}
+
+	if (strcmp(method_name, "light") == 0)
+	{
+		bool toggle = (bool)json_object_get_boolean(root_object, "state");
+
+		if (toggle){
+			GPIO_SetValue(ledDirectMethodGpioFd, GPIO_Value_Low);
+		}
+		else {
+			GPIO_SetValue(ledDirectMethodGpioFd, GPIO_Value_High);
+		}
+	}
+	else if (strcmp(method_name, "fanspeed") == 0)
+	{
+		int speed = (int)json_object_get_number(root_object, "speed");
+		Log_Debug("Set fan speed %d", speed);
+	}
+	else
+	{
+		responseMessage = notFound;
+		result = 404;
+	}
+
+cleanup:
+
+	*responsePayloadSize = strlen(responseMessage);
+	*responsePayload = (unsigned char*)malloc(*responsePayloadSize);
+	strncpy((char*)(*responsePayload), responseMessage, *responsePayloadSize);
+
+	if (root_value != NULL) {
+		json_value_free(root_value);
+	}
+	free(payLoadString);
+
+	return result;
 }
 
 /// <summary>
@@ -295,43 +375,6 @@ static void HubConnectionStatusCallback(IOTHUB_CLIENT_CONNECTION_STATUS result, 
 }
 
 
-static void CommandCollector(const char* method_name, const unsigned char* payload, size_t size,
-	unsigned char** responsePayload, size_t* responsePayloadSize, void* userContextCallback) {
-
-	// Prepare the payload for the response. This is a heap allocated null terminated string.
-	// The Azure IoT Hub SDK is responsible of freeing it.
-	*responsePayload = NULL;  // Response payload content.
-	*responsePayloadSize = 0; // Response payload content size.
-
-	const char* onSuccess = "\"Successfully invoke device method\"";
-	const char* notFound = "\"No method found\"";
-
-	const char* responseMessage = onSuccess;
-	int result = 200;
-
-	if (strcmp(method_name, "lighton") == 0)
-	{
-		GPIO_SetValue(ledDirectMethodGpioFd, GPIO_Value_Low);
-	}
-	else if (strcmp(method_name, "lightoff") == 0)
-	{
-		GPIO_SetValue(ledDirectMethodGpioFd, GPIO_Value_High);
-	}
-	else
-	{
-
-		responseMessage = notFound;
-		result = 404;
-	}
-
-	*responsePayloadSize = strlen(responseMessage);
-	*responsePayload = (unsigned char*)malloc(*responsePayloadSize);
-	strncpy((char*)(*responsePayload), responseMessage, *responsePayloadSize);
-
-	return result;
-
-}
-
 /// <summary>
 ///     Sets up the Azure IoT Hub connection (creates the iothubClientHandle)
 ///     When the SAS Token for a device expires the connection needs to be recreated
@@ -382,7 +425,7 @@ static void SetupAzureClient(void)
 
 	//IoTHubDeviceClient_LL_SetDeviceTwinCallback(iothubClientHandle, TwinCallback, NULL);
 	IoTHubDeviceClient_LL_SetConnectionStatusCallback(iothubClientHandle, HubConnectionStatusCallback, NULL);
-	IoTHubDeviceClient_LL_SetDeviceMethodCallback(iothubClientHandle, CommandCollector, NULL);
+	IoTHubDeviceClient_LL_SetDeviceMethodCallback(iothubClientHandle, DirectMethodProcessor, NULL);
 }
 
 
