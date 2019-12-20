@@ -1,4 +1,12 @@
-﻿# Ignore output directories
+﻿
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Ignore output directories
 /out/
 /install/
-.vs
+.vs/
