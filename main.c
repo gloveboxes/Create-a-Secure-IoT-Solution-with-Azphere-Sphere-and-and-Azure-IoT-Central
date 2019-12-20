@@ -25,12 +25,24 @@
 
 #include "parson.h"
 
+#define SEND_STATUS_PIN 9
+#define LIGHT_PIN 15
+#define RELAY_PIN 0
+
 
 static volatile sig_atomic_t terminationRequired = false;
 
 // Number of bytes to allocate for the JSON telemetry message for IoT Central
 #define JSON_MESSAGE_BYTES 100
 
+typedef struct {
+	int fd;
+	int pin;
+	GPIO_Value initialState;
+	bool invertPin;
+	bool twinState;
+	const char* twinProperty;
+} Peripheral;
 
 // Azure IoT Hub/Central defines.
 #define SCOPEID_LENGTH 20
@@ -43,20 +55,21 @@ static bool iothubAuthenticated = false;
 static void TerminationHandler(int);
 static void SendTelemetry(void);
 static void SetupAzureClient(void);
-static void SendMessageCallback(IOTHUB_CLIENT_CONFIRMATION_RESULT result, void* context);
-
-static const char* GetReasonString(IOTHUB_CLIENT_CONNECTION_STATUS_REASON reason);
-static const char* getAzureSphereProvisioningResultString(AZURE_SPHERE_PROV_RETURN_VALUE provisioningResult);
+static void SendMessageCallback(IOTHUB_CLIENT_CONFIRMATION_RESULT, void*);
+static void TwinReportState(const char*, bool);
+static void SetDesiredState(JSON_Object*, Peripheral*);
+static const char* GetReasonString(IOTHUB_CLIENT_CONNECTION_STATUS_REASON);
+static const char* getAzureSphereProvisioningResultString(AZURE_SPHERE_PROV_RETURN_VALUE);
 
 // Initialization/Cleanup Peripherals
 static int InitPeripheralsAndHandlers(void);
 static void ClosePeripheralsAndHandlers(void);
 
 // event handler data structures. Only the event handler field needs to be populated.
-static void AzureTimerEventHandler(EventData* eventData);
+static void AzureTimerEventHandler(EventData*);
 static EventData azureEventData = { .eventHandler = &AzureTimerEventHandler };
 
-static void AzureDoWorkTimerEventHandler(EventData* eventData);
+static void AzureDoWorkTimerEventHandler(EventData*);
 static EventData azureEventDoWork = { .eventHandler = &AzureDoWorkTimerEventHandler };
 
 // Timer / polling
@@ -71,11 +84,12 @@ static const int AzureIoTMaxReconnectPeriodSeconds = 10 * 60;
 
 static int azureIoTPollPeriodSeconds = 1;
 
-static int blinkOnSendGpioFd = -1;
-static int ledDirectMethodGpioFd = -1;
 static int i2cFd;
 static void* sht31;
 
+static Peripheral sending = { -1, SEND_STATUS_PIN, GPIO_Value_High, true, false, "SendStatus" };
+static Peripheral light = { -1, LIGHT_PIN, GPIO_Value_High, true, false, "LightStatus" };
+static Peripheral relay = { -1, RELAY_PIN, GPIO_Value_Low, false, false, "RelayStatus" };
 
 
 int main(int argc, char* argv[])
@@ -123,12 +137,22 @@ static int ReadTelemetry(char eventBuffer[], size_t len) {
 
 
 static void preSendTelemtry(void) {
-	GPIO_SetValue(blinkOnSendGpioFd, GPIO_Value_Low);
+	GPIO_SetValue(sending.fd, GPIO_Value_Low);
 }
 
 
 static void postSendTelemetry(void) {
-	GPIO_SetValue(blinkOnSendGpioFd, GPIO_Value_High);
+	GPIO_SetValue(sending.fd, GPIO_Value_High);
+}
+
+static int OpenPeripheral(Peripheral *peripheral) {
+	peripheral->fd = GPIO_OpenAsOutput(peripheral->pin, GPIO_OutputMode_PushPull, peripheral->initialState);
+	if (peripheral->fd < 0) {
+		Log_Debug(
+			"Error opening GPIO: %s (%d). Check that app_manifest.json includes the GPIO used.\n",
+			strerror(errno), errno);
+		return -1;
+	}
 }
 
 
@@ -148,23 +172,9 @@ static int InitPeripheralsAndHandlers(void)
 		return -1;
 	}
 
-	// Change this GPIO number and the number in app_manifest.json if required by your hardware.
-	blinkOnSendGpioFd = GPIO_OpenAsOutput(9, GPIO_OutputMode_PushPull, GPIO_Value_High);
-	if (blinkOnSendGpioFd < 0) {
-		Log_Debug(
-			"Error opening GPIO: %s (%d). Check that app_manifest.json includes the GPIO used.\n",
-			strerror(errno), errno);
-		return -1;
-	}
-
-	// Change this GPIO number and the number in app_manifest.json if required by your hardware.
-	ledDirectMethodGpioFd = GPIO_OpenAsOutput(15, GPIO_OutputMode_PushPull, GPIO_Value_High);
-	if (ledDirectMethodGpioFd < 0) {
-		Log_Debug(
-			"Error opening GPIO: %s (%d). Check that app_manifest.json includes the GPIO used.\n",
-			strerror(errno), errno);
-		return -1;
-	}
+	OpenPeripheral(&sending);
+	OpenPeripheral(&relay);
+	OpenPeripheral(&light);
 
 	// Initialize Grove Shield and Grove Temperature and Humidity Sensor
 	GroveShield_Initialize(&i2cFd, 115200);
@@ -173,7 +183,6 @@ static int InitPeripheralsAndHandlers(void)
 	// timer event for sending telemetry to Azure IoT Central
 	azureIoTPollPeriodSeconds = AzureIoTDefaultPollPeriodSeconds;
 	struct timespec azureTelemetryPeriod = { azureIoTPollPeriodSeconds, 0 };
-
 	azureTimerFd = CreateTimerFdAndAddToEpoll(epollFd, &azureTelemetryPeriod, &azureEventData, EPOLLIN);
 	if (azureTimerFd < 0) {
 		return -1;
@@ -195,15 +204,63 @@ static int InitPeripheralsAndHandlers(void)
 static void ClosePeripheralsAndHandlers(void)
 {
 	Log_Debug("Closing file descriptors\n");
-	CloseFdAndPrintError(blinkOnSendGpioFd, "SendBlinker");
 	CloseFdAndPrintError(azureTimerFd, "AzureTimer");
+	CloseFdAndPrintError(azureIotDoWorkTimerFd, "AzureDoWorkTimer");
+	CloseFdAndPrintError(sending.fd, sending.twinProperty);
+	CloseFdAndPrintError(relay.fd, relay.twinProperty);
 	CloseFdAndPrintError(epollFd, "Epoll");
 }
 
+/// <summary>
+///     Callback invoked when a Device Twin update is received from IoT Hub.
+///     Updates local state for 'showEvents' (bool).
+/// </summary>
+/// <param name="payload">contains the Device Twin JSON document (desired and reported)</param>
+/// <param name="payloadSize">size of the Device Twin JSON document</param>
+static void TwinCallback(DEVICE_TWIN_UPDATE_STATE updateState, const unsigned char* payload,
+	size_t payloadSize, void* userContextCallback)
+{
+	JSON_Value* root_value = NULL;
+	JSON_Object* root_object = NULL;
 
-static void DirectMethodProcessor(const char* method_name, const unsigned char* payload, size_t payloadSize,
+	char* payLoadString = (char*)malloc(payloadSize + 1);
+	if (payLoadString == NULL) {
+		goto cleanup;
+	}
+
+	memcpy(payLoadString, payload, payloadSize);
+	payLoadString[payloadSize] = 0; //null terminate string
+
+	root_value = json_parse_string(payLoadString);
+	if (root_value == NULL) {
+		goto cleanup;
+	}
+
+	root_object = json_value_get_object(root_value);
+	if (root_object == NULL) {
+		goto cleanup;
+	}
+
+
+	JSON_Object* desiredProperties = json_object_dotget_object(root_object, "desired");
+	if (desiredProperties == NULL) {
+		desiredProperties = root_object;
+	}
+
+	SetDesiredState(desiredProperties, &relay);
+	SetDesiredState(desiredProperties, &light);
+
+cleanup:
+	// Release the allocated memory.
+	if (root_value != NULL) {
+		json_value_free(root_value);
+	}
+	free(payLoadString);
+}
+
+
+static int AzureDirectMethodHandler(const char* method_name, const unsigned char* payload, size_t payloadSize,
 	unsigned char** responsePayload, size_t* responsePayloadSize, void* userContextCallback) {
-
 
 	const char* onSuccess = "\"Successfully invoke device method\"";
 	const char* notFound = "\"No method found\"";
@@ -231,7 +288,7 @@ static void DirectMethodProcessor(const char* method_name, const unsigned char* 
 	root_value = json_parse_string(payLoadString);
 	if (root_value == NULL) {
 		responseMessage = "Invalid JSON";
-		result =  500;
+		result = 500;
 		goto cleanup;
 	}
 
@@ -240,18 +297,6 @@ static void DirectMethodProcessor(const char* method_name, const unsigned char* 
 		responseMessage = "Invalid JSON";
 		result = 500;
 		goto cleanup;
-	}
-
-	if (strcmp(method_name, "light") == 0)
-	{
-		bool toggle = (bool)json_object_get_boolean(root_object, "state");
-
-		if (toggle){
-			GPIO_SetValue(ledDirectMethodGpioFd, GPIO_Value_Low);
-		}
-		else {
-			GPIO_SetValue(ledDirectMethodGpioFd, GPIO_Value_High);
-		}
 	}
 	else if (strcmp(method_name, "fanspeed") == 0)
 	{
@@ -266,6 +311,8 @@ static void DirectMethodProcessor(const char* method_name, const unsigned char* 
 
 cleanup:
 
+	// Prepare the payload for the response. This is a heap allocated null terminated string.
+	// The Azure IoT Hub SDK is responsible of freeing it.
 	*responsePayloadSize = strlen(responseMessage);
 	*responsePayload = (unsigned char*)malloc(*responsePayloadSize);
 	strncpy((char*)(*responsePayload), responseMessage, *responsePayloadSize);
@@ -276,6 +323,55 @@ cleanup:
 	free(payLoadString);
 
 	return result;
+}
+
+
+
+static void SetDesiredState(JSON_Object* desiredProperties, Peripheral * peripheral) {
+	JSON_Object* jsonObject = json_object_dotget_object(desiredProperties, peripheral->twinProperty);
+	if (jsonObject != NULL) {
+		peripheral->twinState = (bool)json_object_get_boolean(jsonObject, "value");
+		if (peripheral->invertPin) {
+			GPIO_SetValue(peripheral->fd, (peripheral->twinState == true ? GPIO_Value_Low : GPIO_Value_High));
+		}
+		else {
+			GPIO_SetValue(peripheral->fd, (peripheral->twinState == true ? GPIO_Value_High : GPIO_Value_Low));
+		}
+		TwinReportState(peripheral->twinProperty, peripheral->twinState);
+	}
+}
+
+
+/// <summary>
+///     Callback invoked when the Device Twin reported properties are accepted by IoT Hub.
+/// </summary>
+static void ReportStatusCallback(int result, void* context)
+{
+	Log_Debug("INFO: Device Twin reported properties update result: HTTP status code %d\n", result);
+}
+
+static void TwinReportState(const char* propertyName, bool propertyValue)
+{
+	if (iothubClientHandle == NULL) {
+		Log_Debug("ERROR: client not initialized\n");
+	}
+	else {
+		static char reportedPropertiesString[30] = { 0 };
+		int len = snprintf(reportedPropertiesString, 30, "{\"%s\":%s}", propertyName,
+			(propertyValue == true ? "true" : "false"));
+		if (len < 0)
+			return;
+
+		if (IoTHubDeviceClient_LL_SendReportedState(
+			iothubClientHandle, (unsigned char*)reportedPropertiesString,
+			strlen(reportedPropertiesString), ReportStatusCallback, 0) != IOTHUB_CLIENT_OK) {
+			Log_Debug("ERROR: failed to set reported state for '%s'.\n", propertyName);
+		}
+		else {
+			Log_Debug("INFO: Reported state for '%s' to value '%s'.\n", propertyName,
+				(propertyValue == true ? "true" : "false"));
+		}
+	}
 }
 
 /// <summary>
@@ -423,9 +519,9 @@ static void SetupAzureClient(void)
 		return;
 	}
 
-	//IoTHubDeviceClient_LL_SetDeviceTwinCallback(iothubClientHandle, TwinCallback, NULL);
+	IoTHubDeviceClient_LL_SetDeviceTwinCallback(iothubClientHandle, TwinCallback, NULL);
 	IoTHubDeviceClient_LL_SetConnectionStatusCallback(iothubClientHandle, HubConnectionStatusCallback, NULL);
-	IoTHubDeviceClient_LL_SetDeviceMethodCallback(iothubClientHandle, DirectMethodProcessor, NULL);
+	IoTHubDeviceClient_LL_SetDeviceMethodCallback(iothubClientHandle, AzureDirectMethodHandler, NULL);
 }
 
 
