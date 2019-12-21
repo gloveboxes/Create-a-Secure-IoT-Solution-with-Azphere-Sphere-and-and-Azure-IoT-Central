@@ -52,6 +52,28 @@ static IOTHUB_DEVICE_CLIENT_LL_HANDLE iothubClientHandle = NULL;
 static const int keepalivePeriodSeconds = 20;
 static bool iothubAuthenticated = false;
 
+// Timer / polling
+static int azureTimerFd = -1;
+static int epollFd = -1;
+static int azureIotDoWorkTimerFd = -1;
+
+// Azure IoT poll periods
+static const int AzureIoTDefaultPollPeriodSeconds = 5;
+static const int AzureIoTMinReconnectPeriodSeconds = 60;
+static const int AzureIoTMaxReconnectPeriodSeconds = 10 * 60;
+
+static int azureIoTPollPeriodSeconds = 1;
+static int msgId = 0;
+
+static int i2cFd;
+static void* sht31;
+
+static Peripheral sending = { -1, SEND_STATUS_PIN, GPIO_Value_High, true, false, "SendStatus" };
+static Peripheral light = { -1, LIGHT_PIN, GPIO_Value_High, true, false, "LightStatus" };
+static Peripheral relay = { -1, RELAY_PIN, GPIO_Value_Low, false, false, "RelayStatus" };
+
+// Forward signatures
+
 static void TerminationHandler(int);
 static void SendTelemetry(void);
 static void SetupAzureClient(void);
@@ -72,24 +94,7 @@ static EventData azureEventData = { .eventHandler = &AzureTimerEventHandler };
 static void AzureDoWorkTimerEventHandler(EventData*);
 static EventData azureEventDoWork = { .eventHandler = &AzureDoWorkTimerEventHandler };
 
-// Timer / polling
-static int azureTimerFd = -1;
-static int epollFd = -1;
-static int azureIotDoWorkTimerFd = -1;
 
-// Azure IoT poll periods
-static const int AzureIoTDefaultPollPeriodSeconds = 5;
-static const int AzureIoTMinReconnectPeriodSeconds = 60;
-static const int AzureIoTMaxReconnectPeriodSeconds = 10 * 60;
-
-static int azureIoTPollPeriodSeconds = 1;
-
-static int i2cFd;
-static void* sht31;
-
-static Peripheral sending = { -1, SEND_STATUS_PIN, GPIO_Value_High, true, false, "SendStatus" };
-static Peripheral light = { -1, LIGHT_PIN, GPIO_Value_High, true, false, "LightStatus" };
-static Peripheral relay = { -1, RELAY_PIN, GPIO_Value_Low, false, false, "RelayStatus" };
 
 
 int main(int argc, char* argv[])
@@ -131,8 +136,8 @@ static int ReadTelemetry(char eventBuffer[], size_t len) {
 	float temperature = GroveTempHumiSHT31_GetTemperature(sht31);
 	float humidity = GroveTempHumiSHT31_GetHumidity(sht31);
 
-	static const char* EventMsgTemplate = "{ \"Temperature\": \"%3.2f\", \"Humidity\": \"%3.1f\" }";
-	return snprintf(eventBuffer, len, EventMsgTemplate, temperature, humidity);
+	static const char* EventMsgTemplate = "{ \"Temperature\": \"%3.2f\", \"Humidity\": \"%3.1f\", \"MsgId\":%d }";
+	return snprintf(eventBuffer, len, EventMsgTemplate, temperature, humidity, msgId++);
 }
 
 
