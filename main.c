@@ -28,12 +28,14 @@
 #define SEND_STATUS_PIN 9
 #define LIGHT_PIN 15
 #define RELAY_PIN 0
+#define JSON_MESSAGE_BYTES 100
+#define SCOPEID_LENGTH 20
 
 
 static volatile sig_atomic_t terminationRequired = false;
 
 // Number of bytes to allocate for the JSON telemetry message for IoT Central
-#define JSON_MESSAGE_BYTES 100
+
 
 typedef struct {
 	int fd;
@@ -44,18 +46,19 @@ typedef struct {
 	const char* twinProperty;
 } Peripheral;
 
-// Azure IoT Hub/Central defines.
-#define SCOPEID_LENGTH 20
+typedef struct {
+	EventData eventData;
+	struct timespec period;
+	int fd;
+	const char* name;
+} Timer;
+
 static char scopeId[SCOPEID_LENGTH]; // ScopeId for the Azure IoT Central application, set in app_manifest.json, CmdArgs
 
 static IOTHUB_DEVICE_CLIENT_LL_HANDLE iothubClientHandle = NULL;
 static const int keepalivePeriodSeconds = 20;
 static bool iothubAuthenticated = false;
 
-// Timer / polling
-static int azureTimerFd = -1;
-static int epollFd = -1;
-static int azureIotDoWorkTimerFd = -1;
 
 // Azure IoT poll periods
 static const int AzureIoTDefaultPollPeriodSeconds = 5;
@@ -72,8 +75,14 @@ static Peripheral sending = { -1, SEND_STATUS_PIN, GPIO_Value_High, true, false,
 static Peripheral light = { -1, LIGHT_PIN, GPIO_Value_High, true, false, "LightStatus" };
 static Peripheral relay = { -1, RELAY_PIN, GPIO_Value_Low, false, false, "RelayStatus" };
 
-// Forward signatures
+static void AzureTimerEventHandler(EventData*);
+static void AzureDoWorkTimerEventHandler(EventData*);
 
+static int epollFd = -1;
+static Timer iotClientDoWork = { .eventData = {.eventHandler = &AzureDoWorkTimerEventHandler }, .period = { 1, 0 }, .name = "DoWork" };
+static Timer iotClientMeasureSensor = { .eventData = {.eventHandler = &AzureTimerEventHandler }, .period = { 5, 0 }, .name = "MeasureSensor" };
+
+// Forward signatures
 static void TerminationHandler(int);
 static void SendTelemetry(void);
 static void SetupAzureClient(void);
@@ -82,19 +91,8 @@ static void TwinReportState(const char*, bool);
 static void SetDesiredState(JSON_Object*, Peripheral*);
 static const char* GetReasonString(IOTHUB_CLIENT_CONNECTION_STATUS_REASON);
 static const char* getAzureSphereProvisioningResultString(AZURE_SPHERE_PROV_RETURN_VALUE);
-
-// Initialization/Cleanup Peripherals
 static int InitPeripheralsAndHandlers(void);
 static void ClosePeripheralsAndHandlers(void);
-
-// event handler data structures. Only the event handler field needs to be populated.
-static void AzureTimerEventHandler(EventData*);
-static EventData azureEventData = { .eventHandler = &AzureTimerEventHandler };
-
-static void AzureDoWorkTimerEventHandler(EventData*);
-static EventData azureEventDoWork = { .eventHandler = &AzureDoWorkTimerEventHandler };
-
-
 
 
 int main(int argc, char* argv[])
@@ -140,11 +138,9 @@ static int ReadTelemetry(char eventBuffer[], size_t len) {
 	return snprintf(eventBuffer, len, EventMsgTemplate, temperature, humidity, msgId++);
 }
 
-
 static void preSendTelemtry(void) {
 	GPIO_SetValue(sending.fd, GPIO_Value_Low);
 }
-
 
 static void postSendTelemetry(void) {
 	GPIO_SetValue(sending.fd, GPIO_Value_High);
@@ -160,6 +156,12 @@ static int OpenPeripheral(Peripheral *peripheral) {
 	}
 }
 
+static int StartTimer(Timer *timer) {
+	timer->fd = CreateTimerFdAndAddToEpoll(epollFd, &timer->period, &timer->eventData, EPOLLIN);
+	if (timer->fd < 0) {
+		return -1;
+	}
+}
 
 /// <summary>
 ///     Set up SIGTERM termination handler, initialize peripherals, and set up event handlers.
@@ -185,20 +187,8 @@ static int InitPeripheralsAndHandlers(void)
 	GroveShield_Initialize(&i2cFd, 115200);
 	sht31 = GroveTempHumiSHT31_Open(i2cFd);
 
-	// timer event for sending telemetry to Azure IoT Central
-	azureIoTPollPeriodSeconds = AzureIoTDefaultPollPeriodSeconds;
-	struct timespec azureTelemetryPeriod = { azureIoTPollPeriodSeconds, 0 };
-	azureTimerFd = CreateTimerFdAndAddToEpoll(epollFd, &azureTelemetryPeriod, &azureEventData, EPOLLIN);
-	if (azureTimerFd < 0) {
-		return -1;
-	}
-
-	// periodic timer to call IoTHubDeviceClient_LL_DoWork
-	struct timespec azureDoWorkPeriod = { 1, 0 };
-	azureIotDoWorkTimerFd = CreateTimerFdAndAddToEpoll(epollFd, &azureDoWorkPeriod, &azureEventDoWork, EPOLLIN);
-	if (azureIotDoWorkTimerFd < 0) {
-		return -1;
-	}
+	StartTimer(&iotClientDoWork);
+	StartTimer(&iotClientMeasureSensor);
 
 	return 0;
 }
@@ -209,8 +199,8 @@ static int InitPeripheralsAndHandlers(void)
 static void ClosePeripheralsAndHandlers(void)
 {
 	Log_Debug("Closing file descriptors\n");
-	CloseFdAndPrintError(azureTimerFd, "AzureTimer");
-	CloseFdAndPrintError(azureIotDoWorkTimerFd, "AzureDoWorkTimer");
+	CloseFdAndPrintError(iotClientDoWork.fd, iotClientDoWork.name);
+	CloseFdAndPrintError(iotClientMeasureSensor.fd, iotClientMeasureSensor.name);
 	CloseFdAndPrintError(sending.fd, sending.twinProperty);
 	CloseFdAndPrintError(relay.fd, relay.twinProperty);
 	CloseFdAndPrintError(epollFd, "Epoll");
@@ -263,7 +253,6 @@ cleanup:
 	free(payLoadString);
 }
 
-
 static void SetDesiredState(JSON_Object* desiredProperties, Peripheral* peripheral) {
 	JSON_Object* jsonObject = json_object_dotget_object(desiredProperties, peripheral->twinProperty);
 	if (jsonObject != NULL) {
@@ -277,7 +266,6 @@ static void SetDesiredState(JSON_Object* desiredProperties, Peripheral* peripher
 		TwinReportState(peripheral->twinProperty, peripheral->twinState);
 	}
 }
-
 
 static int AzureDirectMethodHandler(const char* method_name, const unsigned char* payload, size_t payloadSize,
 	unsigned char** responsePayload, size_t* responsePayloadSize, void* userContextCallback) {
@@ -346,10 +334,6 @@ cleanup:
 	return result;
 }
 
-
-
-
-
 /// <summary>
 ///     Callback invoked when the Device Twin reported properties are accepted by IoT Hub.
 /// </summary>
@@ -357,7 +341,6 @@ static void ReportStatusCallback(int result, void* context)
 {
 	Log_Debug("INFO: Device Twin reported properties update result: HTTP status code %d\n", result);
 }
-
 
 static void TwinReportState(const char* propertyName, bool propertyValue)
 {
@@ -431,7 +414,7 @@ static void AzureDoWorkTimerEventHandler(EventData* eventData) {
 /// </summary>
 static void AzureTimerEventHandler(EventData* eventData)
 {
-	if (ConsumeTimerFdEvent(azureTimerFd) != 0) {
+	if (ConsumeTimerFdEvent(iotClientMeasureSensor.fd) != 0) {
 		terminationRequired = true;
 		return;
 	}
@@ -458,7 +441,6 @@ static void TerminationHandler(int signalNumber)
 	terminationRequired = true;
 }
 
-
 /// <summary>
 ///     Callback confirming message delivered to IoT Hub.
 /// </summary>
@@ -478,7 +460,6 @@ static void HubConnectionStatusCallback(IOTHUB_CLIENT_CONNECTION_STATUS result, 
 	iothubAuthenticated = (result == IOTHUB_CLIENT_CONNECTION_AUTHENTICATED);
 	Log_Debug("IoT Hub Authenticated: %s\n", GetReasonString(reason));
 }
-
 
 /// <summary>
 ///     Sets up the Azure IoT Hub connection (creates the iothubClientHandle)
@@ -510,7 +491,7 @@ static void SetupAzureClient(void)
 		}
 
 		struct timespec azureTelemetryPeriod = { azureIoTPollPeriodSeconds, 0 };
-		SetTimerFdToPeriod(azureTimerFd, &azureTelemetryPeriod);
+		SetTimerFdToPeriod(iotClientMeasureSensor.fd, &azureTelemetryPeriod);
 
 		Log_Debug("ERROR: failure to create IoTHub Handle - will retry in %i seconds.\n", azureIoTPollPeriodSeconds);
 		return;
@@ -519,7 +500,7 @@ static void SetupAzureClient(void)
 	// Successfully connected, so make sure the polling frequency is back to the default
 	azureIoTPollPeriodSeconds = AzureIoTDefaultPollPeriodSeconds;
 	struct timespec azureTelemetryPeriod = { azureIoTPollPeriodSeconds, 0 };
-	SetTimerFdToPeriod(azureTimerFd, &azureTelemetryPeriod);
+	SetTimerFdToPeriod(iotClientMeasureSensor.fd, &azureTelemetryPeriod);
 
 	iothubAuthenticated = true;
 
@@ -533,8 +514,6 @@ static void SetupAzureClient(void)
 	IoTHubDeviceClient_LL_SetConnectionStatusCallback(iothubClientHandle, HubConnectionStatusCallback, NULL);
 	
 }
-
-
 
 /// <summary>
 ///     Converts AZURE_SPHERE_PROV_RETURN_VALUE to a string.
