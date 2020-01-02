@@ -310,7 +310,7 @@ static int ReadTelemetry(char eventBuffer[], size_t len) {
 
 Handles [Azure IoT Hub Device Twins](https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-device-twins).
 
-In IoT Central Azure Device Twins are exposed in the user interface as *Settings*.
+In Azure IoT Central, Azure IoT Hub Device Twins are exposed in the user interface as *Settings*.
 
 ![](resources/iot-central-device-settings.png)
 
@@ -361,7 +361,7 @@ cleanup:
 
 Handles [Azure IoT Hub Direct Methods](https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-direct-methods)
 
-In IoT Central Azure Device Twins are exposed in the user interface as *Commands*.
+In Azure IoT Central, Azure IoT Hub Direct Methods are exposed in the user interface as *Commands*.
 
 ![](resources/iot-central-device-commands.png)
 
