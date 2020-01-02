@@ -28,14 +28,10 @@
 #define SEND_STATUS_PIN 9
 #define LIGHT_PIN 15
 #define RELAY_PIN 0
-#define JSON_MESSAGE_BYTES 100
+#define JSON_MESSAGE_BYTES 100  // Number of bytes to allocate for the JSON telemetry message for IoT Central
 #define SCOPEID_LENGTH 20
 
-
 static volatile sig_atomic_t terminationRequired = false;
-
-// Number of bytes to allocate for the JSON telemetry message for IoT Central
-
 
 typedef struct {
 	int fd;

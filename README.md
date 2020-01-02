@@ -13,7 +13,7 @@ Follow me on Twitter [@dglover](https://twitter.com/dglover)
 |Hardware | [Seeed Studio Grove Shield](https://www.seeedstudio.com/MT3620-Grove-Shield.html), and the [Grove Temperature and Humidity Sensor (SHT31)](https://www.seeedstudio.com/Grove-Temperature-Humidity-Sensor-SHT31.html) |
 |Source Code | https://github.com/gloveboxes/Create-a-Secure-IoT-Solution-with-Azphere-Sphere-and-and-Azure-IoT-Central|
 |Language| C|
-|Date|As of December, 2019|
+|Date|As of January, 2020|
 
 ## What is Azure Sphere
 
@@ -31,6 +31,20 @@ As billions of new devices are connected, organisations need to secure them to h
 2. Set up Azure IoT Central to work with Azure Sphere
 3. Deploy an Azure IoT Central application to Azure Sphere
 
+## Clone the following Github Repositories
+
+1. The Azure Sphere Samples
+
+   ```bash
+   git clone https://github.com/Azure/azure-sphere-samples.git
+   ```
+
+2. This tutorial
+
+    ```bash
+    git clone https://github.com/gloveboxes/Create-a-Secure-IoT-Solution-with-Azphere-Sphere-and-and-Azure-IoT-Central.git
+    ```
+
 ## Create an Azure IoT Central Application
 
 ### What is Azure IoT Central
@@ -39,11 +53,11 @@ Easily connect, monitor and manage your Internet of Things (IoT) assets at scale
 
 ![Azure IoT Central](resources/azure-iot.png)
 
-We are going to create an Azure IoT Central application, then a device, and finally a device **connection string** needed for the application that will run in the Docker container.
+## Create a Azure IoT Central Application
 
 ![](resources/azure_iot_central.png)
 
-## Create a New IoT Central Application
+We are going to create an Azure IoT Central application, connect Azure IoT Central to an Azure Sphere Tenant, and finally create a device.
 
 1. Open the [Azure IoT Central](https://azure.microsoft.com/en-au/services/iot-central/?WT.mc_id=pycon-blog-dglover) in a new browser tab, then click **Getting started**.
 
@@ -85,43 +99,43 @@ Specify **Application name**, **URL**, enable **7 day free trial**, and complete
     4. Click **Create**.
     5. Name your template, and press **Enter**
 
-#### Create a Capability Model
+### Create a Capability Model
 
-1. Add an Interface
+#### Add an Interface
 
-    1. Click **Custom**,
-	![](resources/iot-central-create-custom.png)
-    2. Click the **+ Add interface** to add an **Interface**.
-	![](resources/iot-central-add-interface.png)
-    3. Choose **Custom** interface.
-    ![](resources/iot-central-capability-model.png)
+1. Click **Custom**,
+![](resources/iot-central-create-custom.png)
+2. Click the **+ Add interface** to add an **Interface**.
+![](resources/iot-central-add-interface.png)
+3. Choose **Custom** interface.
+![](resources/iot-central-capability-model.png)
 
-2. Add Capabilities
+#### Add Capabilities
 
-    ![](resources/iot-central-add-capability.png)
+![](resources/iot-central-add-capability.png)
 
-    Click **<** (Collapse) to create more working space.
+Click **<** (Collapse) to create more working space.
 
-3. Add **Humidity** Capability
+1. Add **Humidity** Capability
     1. Click **+** to Add capability.
-    1. Add **Humidity** Telemetry Capability
-    2. Set the Unit to **%**
+    2. Add **Humidity** Telemetry Capability
+    3. Set the Unit to **%**
 
-    ![](resources/iot-central-add-capability-humidity.png)
+    ![add capability](resources/iot-central-add-capability-humidity.png)
 
-4. Add **Temperature** Capabilities
+2. Add **Temperature** Capabilities
 
-	* Display name: Temperature
-	* Name: Temperature
-	* Semantic type: Temperature
-	* Units: C
-	* Display Unit: C
+    * Display name: Temperature
+    * Name: Temperature
+    * Semantic type: Temperature
+    * Units: C
+    * Display Unit: C
 
-4. Save the Capabilities
+3. Save the Capabilities
 
-    Click **Save** to save the capabilities model.
+Click **Save** to save the capabilities model.
 
-	![](resources/iot-central-save-capabilities.png)
+![](resources/iot-central-save-capabilities.png)
 
 #### Create a Device Template View
 
@@ -130,23 +144,18 @@ Specify **Application name**, **URL**, enable **7 day free trial**, and complete
 3. Click **Generate default dashboard view(s)**
 4. You can customize the default view later.
 
-    ![](resources/iot-central-create-view.png)
+    ![create view](resources/iot-central-create-view.png)
 
 #### Publish the Template
 
 Click **Publish** to activate the template, the click **Publish**.
-![](resources/iot-central-publish-view.png)
+![publish view](resources/iot-central-publish-view.png)
 
-
-## Set up Azure IoT Central to work with Azure Sphere
+## Connect Azure IoT Central to an Azure Azure Sphere Tenant
 
 The Azure Sphere includes out of the box support for Azure IoT Hub and IoT Central.
 
-For this tutorial we will be using the free trail on Azure IoT Central for its built in charting, analytics, device customization and the ability to "White Label" the solution.
-
-### Step 1: Set up Azure IoT Central to work with your Azure Sphere tenant
-
-Follow the [Set up Azure IoT Central to work with Azure Sphere](https://docs.microsoft.com/en-us/azure-sphere/app-development/setup-iot-central) guide.
+Follow the complete [Set up Azure IoT Central to work with Azure Sphere](https://docs.microsoft.com/en-us/azure-sphere/app-development/setup-iot-central) guide.
 
 In summary, you need to:
 
@@ -157,9 +166,7 @@ In summary, you need to:
 5. Verify the tenant CA certificate
 6. Use the validation certificate to verify the tenant identity
 
-### Step 2: Create an Azure Device in Azure IoT Central
-
-
+### Create an Azure Device in Azure IoT Central
 
 From the Azure Sphere Developer Command Prompt, type the following command.
 
@@ -183,85 +190,74 @@ powershell -Command ((azsphere device show-attached)[0] -split ': ')[1].ToLower(
 
 3. Click **Create** to create the new device.
 
-
-
 ## Configure the Azure Sphere Application for Azure IoT Central
 
 Review the [Azure IoT Central Sample ](https://github.com/Azure/azure-sphere-samples/blob/master/Samples/AzureIoT/IoTCentral.md) guide.
 
-### Step 1: Clone the Azure Sphere Samples
+### Config the Azure Sphere Application
 
-```bash
-git clone https://github.com/Azure/azure-sphere-samples.git
-```
+1. Open the *Create-a-Secure-IoT-Solution-with-Azphere-Sphere-and-and-Azure-IoT-Central* solution you cloned with Visual Studio
+2. Open the app_manifest.json file
+3. Set the default Azure Sphere Tenant
+    You may need to select the default Azure Sphere Tenant. Use the ```azsphere tenant list``` command to list available tenants, use the ```azsphere tenant select -i <guid>``` to select the default tenant.
+4. From the Azure Sphere Developer Command Prompt, issue the following command to get the tenant ID. Copy the returned value and paste it into the DeviceAuthentication field of the app_manifest.json file:
 
-### Step 2: Config the Azure Sphere Application
+    ```bash
+    azsphere tenant show-selected
+    ```
 
-Clone the tutorial sample.
+5. From the Azure Sphere Developer Command Prompt, change to the *azure-sphere-samples\Samples\AzureIoT\Tools* folder you previously cloned, and run *ShowIoTCentralConfig.exe*.
 
-1. Clone this tutorial sample application.
-	```bash
-	git clone https://github.com/gloveboxes/Create-a-Secure-IoT-Solution-with-Azphere-Sphere-and-and-Azure-IoT-Central.git
-	```
-2. Open the cloned solution with Visual Studio
-3. Open the app_manifest.json file
-4. Set the default Azure Sphere Tenant
-	You may need to select the default Azure Sphere Tenant. Use the ```azsphere tenant list``` command to list available tenants, use the ```azsphere tenant select -i <guid>``` to select the default tenant.
-5. From the Azure Sphere Developer Command Prompt, issue the following command to get the tenant ID. Copy the returned value and paste it into the DeviceAuthentication field of the app_manifest.json file:
+    ```bash
+    ShowIoTCentralConfig
+    ```
 
-	```bash
-	azsphere tenant show-selected
-	```
+    When prompted, log in with the credentials you use for Azure IoT Central.
 
-6. From the Azure Sphere Developer Command Prompt, run the ShowIoTCentralConfig.exe program from the sample repository (the ShowIoTCentralConfig program is located in the *azure-sphere-samples\Samples\AzureIoT\Tools* folder).
+    The output of this command will be similar as follows:
 
-	```bash
-	ShowIoTCentralConfig
-	```
+    ```
+    Are you using a Work/School account to sign into your IoT Central Application (Y/N) ?
 
-	When prompted, log in with the credentials you use for Azure IoT Central.
+    Getting your IoT Central applications
+    You have one IoT Central application 'yourappname-iot-central'.
+    Getting the Device Provisioning Service (DPS) information.
+    Getting a list of IoT Central devices.
 
-	The output of this command will be similar as follows:
-
-	```
-	Are you using a Work/School account to sign into your IoT Central Application (Y/N) ?
-
-	Getting your IoT Central applications
-	You have one IoT Central application 'yourappname-iot-central'.
-	Getting the Device Provisioning Service (DPS) information.
-	Getting a list of IoT Central devices.
-
-	Find and modify the following lines in your app_manifest.json:
-	"CmdArgs": [ "0ne9992KK6D" ],
-	"AllowedConnections": [ "global.azure-devices-provisioning.net", "saas-iothub-9999999-f33a-4002-4444-7ca8989898989.azure-devices.net" ],
-	"DeviceAuthentication": "--- YOUR AZURE SPHERE TENANT ID--- ",
-	```
+    Find and modify the following lines in your app_manifest.json:
+    "CmdArgs": [ "0ne9992KK6D" ],
+    "AllowedConnections": [ "global.azure-devices-provisioning.net", "saas-iothub-9999999-f33a-4002-4444-7ca8989898989.azure-devices.net" ],
+    "DeviceAuthentication": "--- YOUR AZURE SPHERE TENANT ID--- ",
+    ```
 7. 	Copy the information from the output into the app_manifest.json file in Visual Studio. You *app_manifest.json* file will look similar to the follow:
 
-	```json
-	{
-	"SchemaVersion": 1,
-	"Name": "AzureSphereBlink1",
-	"ComponentId": "a3ca0929-5f46-42b0-91ba-d5de1222da86",
-	"EntryPoint": "/bin/app",
-	"CmdArgs": [ "0ne9992KK6D" ],
-	"Capabilities": {
-		"Gpio": [ 9 ],
-		"Uart": [ "ISU0" ],
-		"AllowedConnections": [ "global.azure-devices-provisioning.net", "saas-iothub-9999999-f33a-4002-4444-7ca8989898989.azure-devices.net" ],
-		"DeviceAuthentication": "999x999xeb-e021-43ce-8gh8-8k9lp888494"
-	},
-	"ApplicationType": "Default"
-	}
-	```
+    ```json
+    {
+    "SchemaVersion": 1,
+    "Name": "AzureSphereBlink1",
+    "ComponentId": "a3ca0929-5f46-42b0-91ba-d5de1222da86",
+    "EntryPoint": "/bin/app",
+    "CmdArgs": [ "0ne9992KK6D" ],
+    "Capabilities": {
+        "Gpio": [ 9 ],
+        "Uart": [ "ISU0" ],
+        "AllowedConnections": [ "global.azure-devices-provisioning.net", "saas-iothub-9999999-f33a-4002-4444-7ca8989898989.azure-devices.net" ],
+        "DeviceAuthentication": "999x999xeb-e021-43ce-8gh8-8k9lp888494"
+    },
+    "ApplicationType": "Default"
+    }
+    ```
 
-## Understanding the main.c Code
+## Understanding Tutorial Solution
 
-Note, this is a simplified implementation of the 
-
-From Visual Studio, open the main.c file.
+From Visual Studio, open the main.c.
 
 Review the following functions.
+
+1. InitPeripheralsAndHandlers
+2. GetTelemetry
+3. TwinCallback
+4. AzureDirectMethodHandler
 
 ### InitPeripheralsAndHandlers
 
@@ -270,53 +266,28 @@ Sets up SIGTERM termination handler, initialize peripherals, and set up event ha
 ```c
 static int InitPeripheralsAndHandlers(void)
 {
-	struct sigaction action;
-	memset(&action, 0, sizeof(struct sigaction));
-	action.sa_handler = TerminationHandler;
-	sigaction(SIGTERM, &action, NULL);
+    struct sigaction action;
+    memset(&action, 0, sizeof(struct sigaction));
+    action.sa_handler = TerminationHandler;
+    sigaction(SIGTERM, &action, NULL);
 
-	epollFd = CreateEpollFd();
-	if (epollFd < 0) {
-		return -1;
-	}
+    epollFd = CreateEpollFd();
+    if (epollFd < 0) {
+        return -1;
+    }
 
-	// Change this GPIO number and the number in app_manifest.json if required by your hardware.
-	blinkOnSendGpioFd = GPIO_OpenAsOutput(9, GPIO_OutputMode_PushPull, GPIO_Value_High);
-	if (blinkOnSendGpioFd < 0) {
-		Log_Debug(
-			"Error opening GPIO: %s (%d). Check that app_manifest.json includes the GPIO used.\n",
-			strerror(errno), errno);
-		return -1;
-	}
+    OpenPeripheral(&sending);
+    OpenPeripheral(&relay);
+    OpenPeripheral(&light);
 
-	// Initialize Grove Shield and Grove Temperature and Humidity Sensor
-	GroveShield_Initialize(&i2cFd, 115200);
-	sht31 = GroveTempHumiSHT31_Open(i2cFd);
+    // Initialize Grove Shield and Grove Temperature and Humidity Sensor
+    GroveShield_Initialize(&i2cFd, 115200);
+    sht31 = GroveTempHumiSHT31_Open(i2cFd);
 
-	// timer event for sending telemetry to Azure IoT Central
-	azureIoTPollPeriodSeconds = AzureIoTDefaultPollPeriodSeconds;
-	struct timespec azureTelemetryPeriod = { azureIoTPollPeriodSeconds, 0 };
+    StartTimer(&iotClientDoWork);
+    StartTimer(&iotClientMeasureSensor);
 
-	azureTimerFd = CreateTimerFdAndAddToEpoll(epollFd, &azureTelemetryPeriod, &azureEventData, EPOLLIN);
-	if (azureTimerFd < 0) {
-		return -1;
-	}
-
-	return 0;
-}
-```
-
-### ClosePeripheralsAndHandlers
-
-Closes peripherals and handlers.
-
-```c
-static void ClosePeripheralsAndHandlers(void)
-{
-	Log_Debug("Closing file descriptors\n");
-	CloseFdAndPrintError(blinkOnSendGpioFd, "SendBlinker");
-	CloseFdAndPrintError(azureTimerFd, "AzureTimer");
-	CloseFdAndPrintError(epollFd, "Epoll");
+    return 0;
 }
 ```
 
@@ -326,11 +297,139 @@ Reads sensor telemetry and returns the data as a JSON object.
 
 ```c
 static int ReadTelemetry(char eventBuffer[], size_t len) {
-	GroveTempHumiSHT31_Read(sht31);
-	float temperature = GroveTempHumiSHT31_GetTemperature(sht31);
-	float humidity = GroveTempHumiSHT31_GetHumidity(sht31);
+    GroveTempHumiSHT31_Read(sht31);
+    float temperature = GroveTempHumiSHT31_GetTemperature(sht31);
+    float humidity = GroveTempHumiSHT31_GetHumidity(sht31);
 
-	static const char* EventMsgTemplate = "{ \"Temperature\": \"%3.2f\", \"Humidity\": \"%3.1f\" }";
-	return snprintf(eventBuffer, len, EventMsgTemplate, temperature, humidity);
+    static const char* EventMsgTemplate = "{ \"Temperature\": \"%3.2f\", \"Humidity\": \"%3.1f\", \"MsgId\":%d }";
+    return snprintf(eventBuffer, len, EventMsgTemplate, temperature, humidity, msgId++);
+}
+```
+
+### TwinCallback
+
+Handles [Azure IoT Hub Device Twins](https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-device-twins).
+
+In IoT Central Azure Device Twins are exposed in the user interface as *Settings*.
+
+![](resources/iot-central-device-settings.png)
+
+```c
+static void TwinCallback(DEVICE_TWIN_UPDATE_STATE updateState, const unsigned char* payload,
+    size_t payloadSize, void* userContextCallback)
+{
+    JSON_Value* root_value = NULL;
+    JSON_Object* root_object = NULL;
+
+    char* payLoadString = (char*)malloc(payloadSize + 1);
+    if (payLoadString == NULL) {
+        goto cleanup;
+    }
+
+    memcpy(payLoadString, payload, payloadSize);
+    payLoadString[payloadSize] = 0; //null terminate string
+
+    root_value = json_parse_string(payLoadString);
+    if (root_value == NULL) {
+        goto cleanup;
+    }
+
+    root_object = json_value_get_object(root_value);
+    if (root_object == NULL) {
+        goto cleanup;
+    }
+
+
+    JSON_Object* desiredProperties = json_object_dotget_object(root_object, "desired");
+    if (desiredProperties == NULL) {
+        desiredProperties = root_object;
+    }
+
+    SetDesiredState(desiredProperties, &relay);
+    SetDesiredState(desiredProperties, &light);
+
+cleanup:
+    // Release the allocated memory.
+    if (root_value != NULL) {
+        json_value_free(root_value);
+    }
+    free(payLoadString);
+}
+```
+
+### AzureDirectMethodHandler
+
+Handles [Azure IoT Hub Direct Methods](https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-direct-methods)
+
+In IoT Central Azure Device Twins are exposed in the user interface as *Commands*.
+
+![](resources/iot-central-device-commands.png)
+
+```c
+static int AzureDirectMethodHandler(const char* method_name, const unsigned char* payload, size_t payloadSize,
+    unsigned char** responsePayload, size_t* responsePayloadSize, void* userContextCallback) {
+
+    const char* onSuccess = "\"Successfully invoke device method\"";
+    const char* notFound = "\"No method found\"";
+
+    const char* responseMessage = onSuccess;
+    int result = 200;
+    JSON_Value* root_value = NULL;
+    JSON_Object* root_object = NULL;
+
+    // Prepare the payload for the response. This is a heap allocated null terminated string.
+    // The Azure IoT Hub SDK is responsible of freeing it.
+    *responsePayload = NULL;  // Response payload content.
+    *responsePayloadSize = 0; // Response payload content size.
+
+    char* payLoadString = (char*)malloc(payloadSize + 1);
+    if (payLoadString == NULL) {
+        responseMessage = "payload memory failed";
+        result = 500;
+        goto cleanup;
+    }
+
+    memcpy(payLoadString, payload, payloadSize);
+    payLoadString[payloadSize] = 0; //null terminate string
+
+    root_value = json_parse_string(payLoadString);
+    if (root_value == NULL) {
+        responseMessage = "Invalid JSON";
+        result = 500;
+        goto cleanup;
+    }
+
+    root_object = json_value_get_object(root_value);
+    if (root_object == NULL) {
+        responseMessage = "Invalid JSON";
+        result = 500;
+        goto cleanup;
+    }
+
+    if (strcmp(method_name, "fanspeed") == 0)
+    {
+        int speed = (int)json_object_get_number(root_object, "speed");
+        Log_Debug("Set fan speed %d", speed);
+    }
+    else
+    {
+        responseMessage = notFound;
+        result = 404;
+    }
+
+cleanup:
+
+    // Prepare the payload for the response. This is a heap allocated null terminated string.
+    // The Azure IoT Hub SDK is responsible of freeing it.
+    *responsePayloadSize = strlen(responseMessage);
+    *responsePayload = (unsigned char*)malloc(*responsePayloadSize);
+    strncpy((char*)(*responsePayload), responseMessage, *responsePayloadSize);
+
+    if (root_value != NULL) {
+        json_value_free(root_value);
+    }
+    free(payLoadString);
+
+    return result;
 }
 ```
