@@ -73,15 +73,15 @@ We are going to create an Azure IoT Central application, connect Azure IoT Centr
 
     ![iot central](resources/iot-central-login.png)
 
-3. Create a new Azure IoT Central application, select **New Application**. This takes you to the **Create Application** page.
+3. Create a new Azure IoT Central application. Scroll to the bottom of the screen, select **Create a custom app**. This takes you to the **Create Application** page.
 
-4. Select **Build as app**
+<!-- 4. Select **Build as app**
 
     ![](resources/iot-central-build-first-app.png)
 
 5. Select **Custom app**
 
-    ![](resources/iot-central-custom-app.png)
+    ![](resources/iot-central-custom-app.png) -->
 
 ### Create a **New application**
 
@@ -116,7 +116,7 @@ Specify **Application name**, **URL**, enable **7 day free trial**, and complete
 2. Click the **+ Add interface** to add an **Interface**.
 ![](resources/iot-central-add-interface.png)
 3. Choose **Custom** interface.
-![](resources/iot-central-capability-model.png)
+<!-- ![](resources/iot-central-capability-model.png) -->
 
 #### Add Capabilities
 
@@ -131,7 +131,7 @@ Click **<** (Collapse) to create more working space.
 
     ![add capability](resources/iot-central-add-capability-humidity.png)
 
-2. Add **Temperature** Capabilities
+2. Click **Add Capability** and add **Temperature** Capabilities
 
     * Display name: Temperature
     * Name: Temperature
@@ -139,11 +139,9 @@ Click **<** (Collapse) to create more working space.
     * Units: C
     * Display Unit: C
 
-3. Save the Capabilities
+3. Click **Save** to save the capabilities model.
 
-Click **Save** to save the capabilities model.
-
-![](resources/iot-central-save-capabilities.png)
+    ![](resources/iot-central-save-capabilities.png)
 
 #### Create a Device Template View
 
@@ -194,6 +192,9 @@ powershell -Command ((azsphere device show-attached)[0] -split ': ')[1].ToLower(
 ![](resources/iot-central-create-device.png)
 
 2. Click **+ New** to add a new device
+
+    Paste in the **device ID** you generated with the PowerShell command into the **Device ID** field and give your device a friendly name.
+
 ![](resources/iot-central-create-new-device.png)
 
 3. Click **Create** to create the new device.
@@ -256,9 +257,9 @@ Review the [Azure IoT Central Sample ](https://github.com/Azure/azure-sphere-sam
     }
     ```
 
-### Configure the App Deployment Settings
+### Configure Visual Studio App Deployment Settings
 
-Before building the application, ensure ARM-Debug and GDB Debugger (HLCore) are selected.
+Before building the application with Visual Studio ensure ARM-Debug and GDB Debugger (HLCore) options are selected.
 
 ![](resources/visual-studio-start-config.png)
 
@@ -275,6 +276,8 @@ Now the application is running on the Azure Sphere switch across to Azure IoT Ce
 ![](resources/iot-central-display-measurements.png)
 
 ### Azure IoT Central Settings
+
+To work with settings you will need to update the Device Template and add settings for **Light** and **Relay**. See the Appendix.
 
 Switch to the settings tab on Azure IoT Central and change the toggle state and click update and observe an LED on the Azure Sphere will toggle between on and off.
 
@@ -473,3 +476,9 @@ cleanup:
     return result;
 }
 ```
+
+### Azure IoT Central Template Settings for Device Twins
+
+![](resources/iot-central-template-settings-relay.png)
+
+![](resources/iot-central-template-settings-light.png)
