@@ -1,4 +1,4 @@
-# Create a Secure IoT Solution with Azure Sphere and Azure IoT Central
+# Integrate Azure Sphere with Azure IoT Central
 
 ![](resources/azure-sphere-iot-central-banner.png)
 
@@ -7,6 +7,7 @@ Follow me on Twitter [@dglover](https://twitter.com/dglover)
 |Author|[Dave Glover](https://developer.microsoft.com/en-us/advocates/dave-glover?WT.mc_id=github-blog-dglover), Microsoft Cloud Developer Advocate |
 |:----|:---|
 |Target Platform | Seeed Studio Azure Sphere MT3620 |
+|Target Service | Azure IoT Central |
 |Developer Platform | Windows 10 or Ubuntu 18.04 |
 |Azure SDK | Azure Sphere SDK 19.11 or better |
 |Developer Tools| [Visual Studio (The free Community Edition or better)](https://visualstudio.microsoft.com/vs/?WT.mc_id=github-blog-dglover) or [Visual Studio Code (Free OSS)](https://code.visualstudio.com?WT.mc_id=github-blog-dglover)|
