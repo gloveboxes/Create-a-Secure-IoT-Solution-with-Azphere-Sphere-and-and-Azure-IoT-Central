@@ -239,7 +239,7 @@ Review the [Azure IoT Central Sample ](https://github.com/Azure/azure-sphere-sam
     "AllowedConnections": [ "global.azure-devices-provisioning.net", "saas-iothub-9999999-f33a-4002-4444-7ca8989898989.azure-devices.net" ],
     "DeviceAuthentication": "--- YOUR AZURE SPHERE TENANT ID--- ",
     ```
-7. 	Copy the information from the output into the app_manifest.json file in Visual Studio. You *app_manifest.json* file will look similar to the follow:
+7. 	Copy the information from the output into the app_manifest.json file in Visual Studio. You *app_manifest.json* file will look similar to the following:
 
     ```json
     {
