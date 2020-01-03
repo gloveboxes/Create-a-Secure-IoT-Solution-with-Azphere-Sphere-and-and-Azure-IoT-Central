@@ -15,15 +15,31 @@ Follow me on Twitter [@dglover](https://twitter.com/dglover)
 |Language| C|
 |Date|As of January, 2020|
 
+## Introduction to Azure Sphere Development
+
+## What you will learn
+
+You will learn how to build an Azure Sphere application that integrates with Azure IoT Central. This includes support for displaying telemetry, controlling the device state using IoT Central *Settings* (Azure IoT Hub Device Twins) and *Commands* (Azure IoT Hub Direct Methods), defining rules to trigger workflows, and a custom dashboard.
+
+If unfamiliar with Azure Sphere development then review the [Create a Secure Azure Sphere App using the Grove Shield Sensor Kit](https://github.com/gloveboxes/Create-a-Secure-Azure-Sphere-App-using-the-Grove-Shield-Sensor-Kit) tutorial before starting this tutorial.
+
 ## What is Azure Sphere
 
 Azure Sphere is a secured, high-level application platform with built-in communication and security features for internet-connected devices.
 
 It comprises a secured, connected, crossover microcontroller unit (MCU), a custom high-level Linux-based operating system (OS), and a cloud-based security service that provides continuous, renewable security.
 
+![](resources/azure-sphere.png)
+
 ## Why Azure Sphere
 
 As billions of new devices are connected, organisations need to secure them to help protect data, privacy, physical safety and infrastructure. Azure Sphere builds on decades of Microsoft experience in hardware, software and cloud to provide a turnkey solution for IoT devices. Get defence in depth to embrace IoT innovation with confidence.
+
+### What is Azure IoT Central
+
+Azure IoT Central provides an an easy way to connect, monitor and manage your Internet of Things (IoT) assets at scale. [Azure IoT Central](https://azure.microsoft.com/en-in/services/iot-central/?WT.mc_id=pycon-blog-dglover) is a hosted, extensible software as a service (SaaS) platform that simplifies setup of your IoT solution and helps reduce the burden and costs of IoT management, operations and development. Provide customers superior products and service while expanding your business possibilities.
+
+![Azure IoT Central](resources/azure-iot.png)
 
 ## Tutorial Overview
 
@@ -46,14 +62,6 @@ As billions of new devices are connected, organisations need to secure them to h
     ```
 
 ## Create an Azure IoT Central Application
-
-### What is Azure IoT Central
-
-Easily connect, monitor and manage your Internet of Things (IoT) assets at scale. [Azure IoT Central](https://azure.microsoft.com/en-in/services/iot-central/?WT.mc_id=pycon-blog-dglover) is a hosted, extensible software as a service (SaaS) platform that simplifies setup of your IoT solution and helps reduce the burden and costs of IoT management, operations and development. Provide customers superior products and service while expanding your business possibilities.
-
-![Azure IoT Central](resources/azure-iot.png)
-
-## Create a Azure IoT Central Application
 
 ![](resources/azure_iot_central.png)
 
@@ -248,7 +256,39 @@ Review the [Azure IoT Central Sample ](https://github.com/Azure/azure-sphere-sam
     }
     ```
 
-## Understanding Tutorial Solution
+### Configure the App Deployment Settings
+
+Before building the application, ensure ARM-Debug and GDB Debugger (HLCore) are selected.
+
+![](resources/visual-studio-start-config.png)
+
+### Build, Deploy, and start Debugging
+
+To start the build, deploy, debug process either click the Visual Studio **Start Selected Item** icon or press **F5**. To Build and deploy without attaching the debugger, simply press **Ctrl+F5**.
+
+![](resources/visual-studio-start-debug.png)
+
+## Azure IoT Central Integration
+
+Now the application is running on the Azure Sphere switch across to Azure IoT Central, select the **Devices** tab, the device template you created, then the actual device. You may have wait a moment before the telemetry is displayed in the **Measurements** panel.
+
+![](resources/iot-central-display-measurements.png)
+
+### Azure IoT Central Settings
+
+Switch to the settings tab on Azure IoT Central and change the toggle state and click update and observe an LED on the Azure Sphere will toggle between on and off.
+
+![iot central device settings](resources/iot-central-display-settings.png)
+
+## Finished 完了 fertig finito ख़त्म होना terminado
+
+Congratulations you have finished the tutorial.
+
+![](resources/finished.jpg)
+
+## Appendix
+
+### Understanding Tutorial Solution
 
 From Visual Studio, open the main.c.
 
@@ -259,7 +299,7 @@ Review the following functions.
 3. TwinCallback
 4. AzureDirectMethodHandler
 
-### InitPeripheralsAndHandlers
+#### InitPeripheralsAndHandlers
 
 Sets up SIGTERM termination handler, initialize peripherals, and set up event handlers.
 
@@ -291,7 +331,7 @@ static int InitPeripheralsAndHandlers(void)
 }
 ```
 
-### GetTelemetry
+#### GetTelemetry
 
 Reads sensor telemetry and returns the data as a JSON object.
 
@@ -306,7 +346,7 @@ static int ReadTelemetry(char eventBuffer[], size_t len) {
 }
 ```
 
-### TwinCallback
+#### TwinCallback
 
 Handles [Azure IoT Hub Device Twins](https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-device-twins).
 
@@ -357,7 +397,7 @@ cleanup:
 }
 ```
 
-### AzureDirectMethodHandler
+#### AzureDirectMethodHandler
 
 Handles [Azure IoT Hub Direct Methods](https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-direct-methods)
 
