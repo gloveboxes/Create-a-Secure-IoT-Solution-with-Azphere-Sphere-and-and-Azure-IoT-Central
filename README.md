@@ -7,7 +7,7 @@ Follow me on Twitter [@dglover](https://twitter.com/dglover)
 |Author|[Dave Glover](https://developer.microsoft.com/en-us/advocates/dave-glover?WT.mc_id=github-blog-dglover), Microsoft Cloud Developer Advocate |
 |:----|:---|
 |Target Platform | Seeed Studio Azure Sphere MT3620 |
-|Target Service | Azure IoT Central |
+|Target Service | [Azure IoT Central](https://azure.microsoft.com/services/iot-central/) |
 |Developer Platform | Windows 10 or Ubuntu 18.04 |
 |Azure SDK | Azure Sphere SDK 19.11 or better |
 |Developer Tools| [Visual Studio (The free Community Edition or better)](https://visualstudio.microsoft.com/vs/?WT.mc_id=github-blog-dglover) or [Visual Studio Code (Free OSS)](https://code.visualstudio.com?WT.mc_id=github-blog-dglover)|
@@ -20,7 +20,7 @@ Follow me on Twitter [@dglover](https://twitter.com/dglover)
 
 ## What you will learn
 
-You will learn how to build an Azure Sphere application that integrates with Azure IoT Central. This includes support for displaying telemetry, controlling the device state using IoT Central *Settings* (Azure IoT Hub Device Twins) and *Commands* (Azure IoT Hub Direct Methods), defining rules to trigger workflows, and a custom dashboard.
+You will learn how to build an [Azure Sphere](https://azure.microsoft.com/services/azure-sphere/) application that integrates with [Azure IoT Central](https://azure.microsoft.com/services/iot-central/). This includes support for displaying telemetry, controlling the device state using IoT Central *Settings* ([Azure IoT Hub Device Twins](https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-device-twins)) and *Commands* ([Azure IoT Hub Direct Methods](https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-direct-methods)), defining rules to trigger workflows, and a custom dashboard.
 
 If unfamiliar with Azure Sphere development then review the [Create a Secure Azure Sphere App using the Grove Shield Sensor Kit](https://github.com/gloveboxes/Create-a-Secure-Azure-Sphere-App-using-the-Grove-Shield-Sensor-Kit) tutorial before starting this tutorial.
 
@@ -34,21 +34,21 @@ It comprises a secured, connected, crossover microcontroller unit (MCU), a custo
 
 ## Why Azure Sphere
 
-As billions of new devices are connected, organisations need to secure them to help protect data, privacy, physical safety and infrastructure. Azure Sphere builds on decades of Microsoft experience in hardware, software and cloud to provide a turnkey solution for IoT devices. Get defence in depth to embrace IoT innovation with confidence.
+As billions of new devices are connected, organizations need to secure them to help protect data, privacy, physical safety, and infrastructure. Azure Sphere builds on decades of Microsoft experience in hardware, software, and cloud to provide a turnkey solution for IoT devices. Get defense in depth to embrace IoT innovation with confidence.
 
 ### What is Azure IoT Central
 
-Azure IoT Central provides an an easy way to connect, monitor and manage your Internet of Things (IoT) assets at scale. [Azure IoT Central](https://azure.microsoft.com/en-in/services/iot-central/?WT.mc_id=pycon-blog-dglover) is a hosted, extensible software as a service (SaaS) platform that simplifies setup of your IoT solution and helps reduce the burden and costs of IoT management, operations and development. Provide customers superior products and service while expanding your business possibilities.
+Azure IoT Central provides an easy way to connect, monitor and manage your Internet of Things (IoT) assets at scale. [Azure IoT Central](https://azure.microsoft.com/en-in/services/iot-central/?WT.mc_id=pycon-blog-dglover) is a hosted, extensible software as a service (SaaS) platform that simplifies the setup of your IoT solution and helps reduce the burden and costs of IoT management, operations, and development. Provide customers superior products and services while expanding your business possibilities.
 
 ![Azure IoT Central](resources/azure-iot.png)
 
 ## Tutorial Overview
 
-1. Create an Azure IoT Central Application (Free trail)
+1. Create an Azure IoT Central Application (Free trial)
 2. Set up Azure IoT Central to work with Azure Sphere
 3. Deploy an Azure IoT Central application to Azure Sphere
 
-## Clone the following Github Repositories
+## Clone the following GitHub Repositories
 
 1. The Azure Sphere Samples
 
@@ -155,7 +155,7 @@ Click **<** (Collapse) to create more working space.
 
 #### Publish the Template
 
-Click **Publish** to activate the template, the click **Publish**.
+Click **Publish** to activate the template, then click **Publish**.
 ![publish view](resources/iot-central-publish-view.png)
 
 ## Connect Azure IoT Central to an Azure Azure Sphere Tenant
@@ -227,7 +227,7 @@ Review the [Azure IoT Central Sample ](https://github.com/Azure/azure-sphere-sam
     The output of this command will be similar as follows:
 
     ```
-    Are you using a Work/School account to sign into your IoT Central Application (Y/N) ?
+    Are you using a Work/School account to sign in to your IoT Central Application (Y/N) ?
 
     Getting your IoT Central applications
     You have one IoT Central application 'yourappname-iot-central'.
@@ -272,7 +272,7 @@ To start the build, deploy, debug process either click the Visual Studio **Start
 
 ## Azure IoT Central Integration
 
-Now the application is running on the Azure Sphere switch across to Azure IoT Central, select the **Devices** tab, the device template you created, then the actual device. You may have wait a moment before the telemetry is displayed in the **Measurements** panel.
+Now the application is running on the Azure Sphere switch across to Azure IoT Central, select the **Devices** tab, the device template you created, then the actual device. You may have to wait a moment before the telemetry is displayed in the **Measurements** panel.
 
 ![](resources/iot-central-display-measurements.png)
 
