@@ -8,10 +8,6 @@
 #include <applibs/log.h>
 #include <applibs/gpio.h>
 
-// Grove Temperature and Humidity Sensor
-#include "../MT3620_Grove_Shield/MT3620_Grove_Shield_Library/Grove.h"
-#include "../MT3620_Grove_Shield/MT3620_Grove_Shield_Library/Sensors/GroveTempHumiSHT31.h"
-
 // Azure IoT SDK
 #include <iothub_client_core_common.h>
 #include <iothub_device_client_ll.h>
@@ -20,8 +16,20 @@
 #include <iothub.h>
 #include <azure_sphere_provisioning.h>
 
+
+
+// Core to core communications libraries
+#include <ctype.h>
+#include <sys/time.h>
+#include <sys/socket.h>
+#include <applibs/application.h>
+
 #include <applibs/networking.h>
 #include "epoll_timerfd_utilities.h"
+
+// Grove Temperature and Humidity Sensor
+#include "../MT3620_Grove_Shield/MT3620_Grove_Shield_Library/Grove.h"
+#include "../MT3620_Grove_Shield/MT3620_Grove_Shield_Library/Sensors/GroveTempHumiSHT31.h"
 
 #include "parson.h"
 
@@ -73,10 +81,19 @@ static Peripheral relay = { -1, RELAY_PIN, GPIO_Value_Low, false, false, "RelayS
 
 static void AzureTimerEventHandler(EventData*);
 static void AzureDoWorkTimerEventHandler(EventData*);
+static void SocketEventHandler(EventData* eventData);
+static void TimerEventHandler(EventData* eventData);
 
 static int epollFd = -1;
 static Timer iotClientDoWork = { .eventData = {.eventHandler = &AzureDoWorkTimerEventHandler }, .period = { 1, 0 }, .name = "DoWork" };
 static Timer iotClientMeasureSensor = { .eventData = {.eventHandler = &AzureTimerEventHandler }, .period = { 5, 0 }, .name = "MeasureSensor" };
+static Timer rtCoreSend = { .eventData = {.eventHandler = &TimerEventHandler }, .period = { 1, 0 }, .name = "rtCoreSend" };
+
+//static int timerFd = -1;
+static int sockFd = -1;
+static const char rtAppComponentId[] = "005180bc-402f-4cb3-a662-72937dbcde47";
+static void SendMessageToRTCore(void);
+static EventData socketEventData = { .eventHandler = &SocketEventHandler };
 
 // Forward signatures
 static void TerminationHandler(int);
@@ -89,6 +106,7 @@ static const char* GetReasonString(IOTHUB_CLIENT_CONNECTION_STATUS_REASON);
 static const char* getAzureSphereProvisioningResultString(AZURE_SPHERE_PROV_RETURN_VALUE);
 static int InitPeripheralsAndHandlers(void);
 static void ClosePeripheralsAndHandlers(void);
+
 
 
 int main(int argc, char* argv[])
@@ -185,6 +203,28 @@ static int InitPeripheralsAndHandlers(void)
 
 	StartTimer(&iotClientDoWork);
 	StartTimer(&iotClientMeasureSensor);
+	StartTimer(&rtCoreSend);
+
+
+	// Open connection to real-time capable application.
+	sockFd = Application_Socket(rtAppComponentId);
+	if (sockFd == -1) {
+		Log_Debug("ERROR: Unable to create socket: %d (%s)\n", errno, strerror(errno));
+		return -1;
+	}
+
+	// Set timeout, to handle case where real-time capable application does not respond.
+	static const struct timeval recvTimeout = { .tv_sec = 5, .tv_usec = 0 };
+	int result = setsockopt(sockFd, SOL_SOCKET, SO_RCVTIMEO, &recvTimeout, sizeof(recvTimeout));
+	if (result == -1) {
+		Log_Debug("ERROR: Unable to set socket timeout: %d (%s)\n", errno, strerror(errno));
+		return -1;
+	}
+
+	// Register handler for incoming messages from real-time capable application.
+	if (RegisterEventHandlerToEpoll(epollFd, sockFd, &socketEventData, EPOLLIN) != 0) {
+		return -1;
+	}
 
 	return 0;
 }
@@ -197,6 +237,7 @@ static void ClosePeripheralsAndHandlers(void)
 	Log_Debug("Closing file descriptors\n");
 	CloseFdAndPrintError(iotClientDoWork.fd, iotClientDoWork.name);
 	CloseFdAndPrintError(iotClientMeasureSensor.fd, iotClientMeasureSensor.name);
+	CloseFdAndPrintError(rtCoreSend.fd, rtCoreSend.name);
 	CloseFdAndPrintError(sending.fd, sending.twinProperty);
 	CloseFdAndPrintError(relay.fd, relay.twinProperty);
 	CloseFdAndPrintError(epollFd, "Epoll");
@@ -565,4 +606,58 @@ static const char* GetReasonString(IOTHUB_CLIENT_CONNECTION_STATUS_REASON reason
 		break;
 	}
 	return reasonString;
+}
+
+/// <summary>
+///     Handle socket event by reading incoming data from real-time capable application.
+/// </summary>
+static void SocketEventHandler(EventData* eventData)
+{
+	// Read response from real-time capable application.
+	char rxBuf[32];
+	int bytesReceived = recv(sockFd, rxBuf, sizeof(rxBuf), 0);
+
+	if (bytesReceived == -1) {
+		Log_Debug("ERROR: Unable to receive message: %d (%s)\n", errno, strerror(errno));
+		terminationRequired = true;
+	}
+
+	Log_Debug("Received %d bytes: ", bytesReceived);
+	for (int i = 0; i < bytesReceived; ++i) {
+		Log_Debug("%c", isprint(rxBuf[i]) ? rxBuf[i] : '.');
+	}
+	Log_Debug("\n");
+}
+
+/// <summary>
+///     Handle send timer event by writing data to the real-time capable application.
+/// </summary>
+static void TimerEventHandler(EventData* eventData)
+{
+	if (ConsumeTimerFdEvent(rtCoreSend.fd) != 0) {
+		terminationRequired = true;
+		return;
+	}
+
+	SendMessageToRTCore();
+}
+
+/// <summary>
+///     Helper function for TimerEventHandler sends message to real-time capable application.
+/// </summary>
+static void SendMessageToRTCore(void)
+{
+	static int iter = 0;
+
+	// Send "HELLO-WORLD-%d" message to real-time capable application.
+	static char txMessage[32];
+	sprintf(txMessage, "Hello-World-%d", iter++);
+	Log_Debug("Sending: %s\n", txMessage);
+
+	int bytesSent = send(sockFd, txMessage, strlen(txMessage), 0);
+	if (bytesSent == -1) {
+		Log_Debug("ERROR: Unable to send message: %d (%s)\n", errno, strerror(errno));
+		terminationRequired = true;
+		return;
+	}
 }
