@@ -1,17 +1,96 @@
 ﻿#  Copyright (c) Microsoft Corporation. All rights reserved.
 #  Licensed under the MIT License.
 
-cmake_minimum_required (VERSION 3.8)
+###################################################################################################################
+
+# Select your developer board by removing the # tag from the beginning of the line
+
+# The default board selected is the AVNET Starter Kit.
+
+# If you are NOT using the AVNET board be sure to comment out the AVNET board
+
+# set(AVNET TRUE "AVNET Azure Sphere Starter Kit")                
+set(SEEED_STUDIO_RDB TRUE "Seeed Studio Azure Sphere MT3620 Development Kit (aka Reference Design Board or rdb)")
+# set(SEEED_STUDIO_MINI TRUE "Seeed Studio Azure Sphere MT3620 Mini Dev Board")
+
+###################################################################################################################
+
+cmake_minimum_required (VERSION 3.10)
 project (AzureSphereIoTCentral C)
 
-add_subdirectory("../MT3620_Grove_Shield/MT3620_Grove_Shield_Library" out)
+azsphere_configure_tools(TOOLS_REVISION "20.07")
+azsphere_configure_api(TARGET_API_SET "6")
+
+
+add_subdirectory("./LearningPathLibrary")
+add_subdirectory("./MT3620_Grove_Shield_Library")
+
+set(Source
+    "main.c"
+)
+source_group("Source" FILES ${Source})
+
+if(AVNET)
+
+    set(Oem
+        "./LearningPathLibrary/AVNET/lps22hh_reg.c"
+        "./LearningPathLibrary/AVNET/lsm6dso_reg.c"
+        "./LearningPathLibrary/AVNET/imu_temp_pressure.c"
+        "./LearningPathLibrary/AVNET/light_sensor.c"
+        "./LearningPathLibrary/AVNET/board.c"
+    )
+    source_group("Oem" FILES ${Oem})
+
+    add_definitions( -DOEM_AVNET=TRUE )
+
+endif(AVNET)
+
+if(SEEED_STUDIO_RDB OR SEEED_STUDIO_MINI)
+
+    set(Oem
+        "./LearningPathLibrary/SEEED_STUDIO/board.c"
+    )
+    source_group("Oem" FILES ${Oem})
+
+    add_definitions( -DOEM_SEEED_STUDIO=TRUE )
+
+endif(SEEED_STUDIO_RDB OR SEEED_STUDIO_MINI)
+
+set(ALL_FILES
+    ${Source}
+    ${Oem}
+)
 
 # Create executable
-ADD_EXECUTABLE(${PROJECT_NAME} main.c epoll_timerfd_utilities.c parson.c)
-TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${AZURE_SPHERE_API_SET_DIR}/usr/include/azureiot)
-TARGET_COMPILE_DEFINITIONS(${PROJECT_NAME} PUBLIC AZURE_IOT_HUB_CONFIGURED)
-TARGET_LINK_LIBRARIES(${PROJECT_NAME} applibs pthread gcc_s c MT3620_Grove_Shield_Library azureiot)
+add_executable(${PROJECT_NAME} ${ALL_FILES})
+target_compile_definitions(${PROJECT_NAME} PUBLIC AZURE_IOT_HUB_CONFIGURED)
+target_link_libraries(${PROJECT_NAME} applibs pthread gcc_s c azsphere_libs MT3620_Grove_Shield_Library)
+
+target_include_directories(${PROJECT_NAME} PUBLIC
+                           ./LearningPathLibrary
+                           ./MT3620_Grove_Shield_Library
+                           ./
+                          )
+
+target_compile_options(${PROJECT_NAME} PRIVATE -Wno-unknown-pragmas)
+set_source_files_properties(./LearningPathLibrary/AVNET/lsm6dso_reg.c PROPERTIES COMPILE_FLAGS -Wno-conversion)
+set_source_files_properties(./LearningPathLibrary/AVNET/lps22hh_reg.c PROPERTIES COMPILE_FLAGS -Wno-conversion)
+
+set_source_files_properties(./LearningPathLibrary/AVNET/imu_temp_pressure.c PROPERTIES COMPILE_FLAGS -Wno-float-conversion)
+set_source_files_properties(./LearningPathLibrary/AVNET/imu_temp_pressure.c PROPERTIES COMPILE_FLAGS -Wno-incompatible-pointer-types)
+set_source_files_properties(./LearningPathLibrary/AVNET/imu_temp_pressure.c PROPERTIES COMPILE_FLAGS -Wno-conversion)
 
 
-# Add MakeImage post-build command
-include ("${AZURE_SPHERE_MAKE_IMAGE_FILE}")
+if(AVNET)
+    azsphere_target_hardware_definition(${PROJECT_NAME} TARGET_DIRECTORY "./HardwareDefinitions/avnet_mt3620_sk" TARGET_DEFINITION "azure_sphere_learning_path.json")
+endif(AVNET)
+
+if (SEEED_STUDIO_RDB)
+    azsphere_target_hardware_definition(${PROJECT_NAME} TARGET_DIRECTORY "./HardwareDefinitions/mt3620_rdb" TARGET_DEFINITION "azure_sphere_learning_path.json")
+endif()
+
+if (SEEED_STUDIO_MINI)
+    azsphere_target_hardware_definition(${PROJECT_NAME} TARGET_DIRECTORY "./HardwareDefinitions/seeed_mt3620_mdb" TARGET_DEFINITION "azure_sphere_learning_path.json")
+endif(SEEED_STUDIO_MINI)
+
+azsphere_target_add_image_package(${PROJECT_NAME})
