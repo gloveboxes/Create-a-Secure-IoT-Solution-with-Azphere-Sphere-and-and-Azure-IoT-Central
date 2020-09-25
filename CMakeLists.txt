@@ -13,6 +13,9 @@
 set(SEEED_STUDIO_RDB TRUE "Seeed Studio Azure Sphere MT3620 Development Kit (aka Reference Design Board or rdb)")
 # set(SEEED_STUDIO_MINI TRUE "Seeed Studio Azure Sphere MT3620 Mini Dev Board")
 
+# Uncomment if using Seeed Studio Grove Shield
+set(SEEED_GROVE_SHIELD TRUE "Using Seeed Grove Shield")
+
 ###################################################################################################################
 
 cmake_minimum_required (VERSION 3.10)
@@ -21,9 +24,14 @@ project (AzureSphereIoTCentral C)
 azsphere_configure_tools(TOOLS_REVISION "20.07")
 azsphere_configure_api(TARGET_API_SET "6")
 
-
 add_subdirectory("./LearningPathLibrary")
+
+if(SEEED_GROVE_SHIELD)
+
 add_subdirectory("./MT3620_Grove_Shield_Library")
+add_definitions( -DSEEED_GROVE_SHIELD=TRUE )
+
+endif(SEEED_GROVE_SHIELD)
 
 set(Source
     "main.c"
@@ -64,13 +72,16 @@ set(ALL_FILES
 # Create executable
 add_executable(${PROJECT_NAME} ${ALL_FILES})
 target_compile_definitions(${PROJECT_NAME} PUBLIC AZURE_IOT_HUB_CONFIGURED)
-target_link_libraries(${PROJECT_NAME} applibs pthread gcc_s c azsphere_libs MT3620_Grove_Shield_Library)
+target_link_libraries(${PROJECT_NAME} applibs pthread gcc_s c azsphere_libs)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
                            ./LearningPathLibrary
-                           ./MT3620_Grove_Shield_Library
-                           ./
-                          )
+                           ./ )
+
+if(SEEED_GROVE_SHIELD)
+    target_link_libraries(${PROJECT_NAME} MT3620_Grove_Shield_Library)
+    target_include_directories(${PROJECT_NAME} PUBLIC ./MT3620_Grove_Shield_Library )
+endif(SEEED_GROVE_SHIELD)
 
 target_compile_options(${PROJECT_NAME} PRIVATE -Wno-unknown-pragmas)
 set_source_files_properties(./LearningPathLibrary/AVNET/lsm6dso_reg.c PROPERTIES COMPILE_FLAGS -Wno-conversion)

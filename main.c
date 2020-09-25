@@ -53,6 +53,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <time.h>
+#include <math.h>
 
 // Hardware specific
 #ifdef OEM_AVNET
@@ -61,14 +62,25 @@
 #include "AVNET/light_sensor.h"
 #endif // OEM_AVNET
 
-// Hardware specific
-//#ifdef OEM_SEEED_STUDIO
-//#include "SEEED_STUDIO/board.h"
-//#endif // SEEED_STUDIO
 
+
+#ifdef SEEED_GROVE_SHIELD
 // Grove Temperature and Humidity Sensor
 #include "Grove.h"
 #include "Sensors/GroveTempHumiSHT31.h"
+
+// Required for Grove Sensors
+static int i2cFd;
+static void* sht31;
+
+#else
+
+//Developer board specific
+#ifdef OEM_SEEED_STUDIO
+#include "SEEED_STUDIO/board.h"
+#endif // SEEED_STUDIO
+
+#endif // SEEED_GROVE
 
 #define JSON_MESSAGE_BYTES 256  // Number of bytes to allocate for the JSON telemetry message for IoT Central
 
@@ -78,27 +90,28 @@ static void MeasureSensorHandler(EventLoopTimer* eventLoopTimer);
 static void NetworkConnectionStatusHandler(EventLoopTimer* eventLoopTimer);
 
 
-// Required for Grove Sensors
-static int i2cFd;
-static void* sht31;
-
 static char msgBuffer[JSON_MESSAGE_BYTES] = { 0 };
 
 static const struct timespec sendMsgLedBlinkPeriod = { 0, 300 * 1000 * 1000 };
 
-// GPIO Input Peripherals
-static LP_PERIPHERAL_GPIO buttonA = { .pin = BUTTON_A, .direction = LP_INPUT, .initialise = lp_openPeripheralGpio, .name = "buttonA" };
-static LP_PERIPHERAL_GPIO buttonB = { .pin = BUTTON_B, .direction = LP_INPUT, .initialise = lp_openPeripheralGpio, .name = "buttonB" };
-
 // GPIO Output PeripheralGpios
-static LP_PERIPHERAL_GPIO led1 = { .pin = LED1, .direction = LP_OUTPUT, .initialState = GPIO_Value_Low, .invertPin = true,
-	.initialise = lp_openPeripheralGpio, .name = "led1" };
+static LP_PERIPHERAL_GPIO sendMsgLed = {
+	.pin = LED2,
+	.direction = LP_OUTPUT,
+	.initialState = GPIO_Value_Low,
+	.invertPin = true,
+	.initialise = lp_openPeripheralGpio,
+	.name = "sendMsgLed"
+};
 
-static LP_PERIPHERAL_GPIO sendMsgLed = { .pin = LED2, .direction = LP_OUTPUT, .initialState = GPIO_Value_Low, .invertPin = true,
-	.initialise = lp_openPeripheralGpio, .name = "sendMsgLed" };
-
-static LP_PERIPHERAL_GPIO networkConnectedLed = { .pin = NETWORK_CONNECTED_LED, .direction = LP_OUTPUT, .initialState = GPIO_Value_Low, .invertPin = true,
-	.initialise = lp_openPeripheralGpio, .name = "networkConnectedLed" };
+static LP_PERIPHERAL_GPIO networkConnectedLed = {
+	.pin = NETWORK_CONNECTED_LED,
+	.direction = LP_OUTPUT,
+	.initialState = GPIO_Value_Low,
+	.invertPin = true,
+	.initialise = lp_openPeripheralGpio,
+	.name = "networkConnectedLed"
+};
 
 // Timers
 static LP_TIMER sendMsgLedOffOneShotTimer = { .period = { 0, 0 }, .name = "sendMsgLedOffOneShotTimer", .handler = LedOffHandler };
@@ -106,7 +119,7 @@ static LP_TIMER networkConnectionStatusTimer = { .period = { 5, 0 }, .name = "ne
 static LP_TIMER measureSensorTimer = { .period = { 10, 0 }, .name = "measureSensorTimer", .handler = MeasureSensorHandler };
 
 // Initialize Sets
-LP_PERIPHERAL_GPIO* peripheralGpioSet[] = { &buttonA, &buttonB, &led1, &sendMsgLed, &networkConnectedLed };
+LP_PERIPHERAL_GPIO* peripheralGpioSet[] = { &sendMsgLed, &networkConnectedLed };
 LP_TIMER* timerSet[] = { &sendMsgLedOffOneShotTimer, &networkConnectionStatusTimer, &measureSensorTimer };
 
 // Message templates and property sets
@@ -160,7 +173,7 @@ static void SendMsgLedOn(char* message)
 }
 
 /// <summary>
-/// One shot timer to turn LED2 off
+/// One shot timer to turn sendMsgLed off
 /// </summary>
 static void LedOffHandler(EventLoopTimer* eventLoopTimer)
 {
@@ -178,7 +191,7 @@ static void LedOffHandler(EventLoopTimer* eventLoopTimer)
 static void MeasureSensorHandler(EventLoopTimer* eventLoopTimer)
 {
 	static int msgId = 0;
-	//static LP_ENVIRONMENT environment;
+	int len = 0;
 
 	if (ConsumeEventLoopTimerEvent(eventLoopTimer) != 0)
 	{
@@ -186,11 +199,28 @@ static void MeasureSensorHandler(EventLoopTimer* eventLoopTimer)
 		return;
 	}
 
+#ifdef SEEED_GROVE_SHIELD
+
 	GroveTempHumiSHT31_Read(sht31);
 	float temperature = GroveTempHumiSHT31_GetTemperature(sht31);
 	float humidity = GroveTempHumiSHT31_GetHumidity(sht31);
+	if (!isnan(temperature) && !isnan(humidity))
+	{
+		len = snprintf(msgBuffer, JSON_MESSAGE_BYTES, MsgTemplate, temperature, humidity, 0, 0, msgId++);
+	}
 
-	if (snprintf(msgBuffer, JSON_MESSAGE_BYTES, MsgTemplate, temperature, humidity, 0, 0, msgId++) > 0)
+#else
+
+	static LP_ENVIRONMENT environment;
+
+	if (lp_readTelemetry(&environment))
+	{
+		len = snprintf(msgBuffer, JSON_MESSAGE_BYTES, MsgTemplate, environment.temperature, environment.humidity, environment.pressure, environment.light, msgId++);
+	}
+
+#endif // SEEED_GROVE_SHIELD
+
+	if (len > 0)
 	{
 		// Message properties can be used for message routing in IOT Hub
 		lp_setMessageProperties(telemetryMessageProperties, NELEMS(telemetryMessageProperties));
@@ -200,6 +230,7 @@ static void MeasureSensorHandler(EventLoopTimer* eventLoopTimer)
 		// optional: clear if you are sending other message types that don't require these properties
 		lp_clearMessageProperties();
 	}
+
 }
 
 /// <summary>
@@ -208,11 +239,13 @@ static void MeasureSensorHandler(EventLoopTimer* eventLoopTimer)
 /// <returns>0 on success, or -1 on failure</returns>
 static void InitPeripheralsAndHandlers(void)
 {
-
+#ifdef SEEED_GROVE_SHIELD
 	// Initialize Grove Shield and Grove Temperature and Humidity Sensor
 	GroveShield_Initialize(&i2cFd, 115200);
-
 	sht31 = GroveTempHumiSHT31_Open(i2cFd);
+#else
+	lp_initializeDevKit();
+#endif
 
 	lp_openPeripheralGpioSet(peripheralGpioSet, NELEMS(peripheralGpioSet));
 
@@ -230,6 +263,10 @@ static void ClosePeripheralsAndHandlers(void)
 	lp_stopCloudToDevice();
 
 	lp_closePeripheralGpioSet();
+
+#ifndef SEEED_GROVE_SHIELD
+	lp_closeDevKit();
+#endif
 
 	lp_stopTimerEventLoop();
 }
