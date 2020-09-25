@@ -69,6 +69,8 @@
 // Grove Temperature and Humidity Sensor
 #include "Grove.h"
 #include "Sensors/GroveTempHumiSHT31.h"
+#include "Sensors/GroveLightSensor.h"
+#include "Sensors/GroveAD7992.h"
 
 #define JSON_MESSAGE_BYTES 256  // Number of bytes to allocate for the JSON telemetry message for IoT Central
 
@@ -81,6 +83,7 @@ static void NetworkConnectionStatusHandler(EventLoopTimer* eventLoopTimer);
 // Required for Grove Sensors
 static int i2cFd;
 static void* sht31;
+static void *light;
 
 static char msgBuffer[JSON_MESSAGE_BYTES] = { 0 };
 
@@ -186,9 +189,17 @@ static void MeasureSensorHandler(EventLoopTimer* eventLoopTimer)
 		return;
 	}
 
-	GroveTempHumiSHT31_Read(sht31);
-	float temperature = GroveTempHumiSHT31_GetTemperature(sht31);
-	float humidity = GroveTempHumiSHT31_GetHumidity(sht31);
+	// GroveTempHumiSHT31_Read(sht31);
+	// float temperature = GroveTempHumiSHT31_GetTemperature(sht31);
+	// float humidity = GroveTempHumiSHT31_GetHumidity(sht31);
+
+	float value = GroveLightSensor_Read(light);
+	value = GroveAD7992_ConvertToMillisVolt(value);
+
+	Log_Debug("Light value %dmV\n", (uint16_t)value);
+
+	float temperature = 0;
+	float humidity = 0;
 
 
 	if (snprintf(msgBuffer, JSON_MESSAGE_BYTES, MsgTemplate, temperature, humidity, 0, 0, msgId++) > 0)
@@ -213,7 +224,10 @@ static void InitPeripheralsAndHandlers(void)
 
 	// Initialize Grove Shield and Grove Temperature and Humidity Sensor
 	GroveShield_Initialize(&i2cFd, 115200);
-	sht31 = GroveTempHumiSHT31_Open(i2cFd);
+
+	// sht31 = GroveTempHumiSHT31_Open(i2cFd);
+
+	light = GroveLightSensor_Init(i2cFd, 0);
 
 	lp_openPeripheralGpioSet(peripheralGpioSet, NELEMS(peripheralGpioSet));
 
