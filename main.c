@@ -206,7 +206,7 @@ static void MeasureSensorHandler(EventLoopTimer* eventLoopTimer)
 	float humidity = GroveTempHumiSHT31_GetHumidity(sht31);
 	if (!isnan(temperature) && !isnan(humidity))
 	{
-		len = snprintf(msgBuffer, JSON_MESSAGE_BYTES, MsgTemplate, temperature, humidity, 0, 0, msgId++);
+		len = snprintf(msgBuffer, JSON_MESSAGE_BYTES, MsgTemplate, temperature, humidity, 0.0, 0, msgId++);
 	}
 
 #else
