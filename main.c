@@ -264,10 +264,6 @@ static void ClosePeripheralsAndHandlers(void)
 
 	lp_closePeripheralGpioSet();
 
-#ifndef SEEED_GROVE_SHIELD
-	lp_closeDevKit();
-#endif
-
 	lp_stopTimerEventLoop();
 }
 
