@@ -4,13 +4,13 @@
 
 Follow me on Twitter [@dglover](https://twitter.com/dglover)
 
-|Author|[Dave Glover](https://developer.microsoft.com/en-us/advocates/dave-glover?WT.mc_id=github-blog-dglover), Microsoft Cloud Developer Advocate |
+|Author|[Dave Glover](https://developer.microsoft.com/advocates/dave-glover?WT.mc_id=iot-0000-dglover), Microsoft Cloud Developer Advocate |
 |:----|:---|
 |Target Platform | Seeed Studio Azure Sphere MT3620 |
-|Target Service | [Azure IoT Central](https://azure.microsoft.com/services/iot-central/?WT.mc_id=github-blog-dglover) |
+|Target Service | [Azure IoT Central](https://azure.microsoft.com/services/iot-central/?WT.mc_id=iot-0000-dglover) |
 |Developer Platform | Windows 10 or Ubuntu 18.04 |
 |Azure SDK | Azure Sphere SDK 19.11 or better |
-|Developer Tools| [Visual Studio (The free Community Edition or better)](https://visualstudio.microsoft.com/vs/?WT.mc_id=github-blog-dglover) or [Visual Studio Code (Free OSS)](https://code.visualstudio.com?WT.mc_id=github-blog-dglover)|
+|Developer Tools| [Visual Studio (The free Community Edition or better)](https://visualstudio.microsoft.com/vs/?WT.mc_id=iot-0000-dglover) or [Visual Studio Code (Free OSS)](https://code.visualstudio.com/?WT.mc_id=iot-0000-dglover)|
 |Hardware | [Seeed Studio Grove Shield](https://www.seeedstudio.com/MT3620-Grove-Shield.html), and the [Grove Temperature and Humidity Sensor (SHT31)](https://www.seeedstudio.com/Grove-Temperature-Humidity-Sensor-SHT31.html) |
 |Source Code | https://github.com/gloveboxes/Create-a-Secure-IoT-Solution-with-Azphere-Sphere-and-and-Azure-IoT-Central|
 |Language| C|
@@ -20,7 +20,7 @@ Follow me on Twitter [@dglover](https://twitter.com/dglover)
 
 ## What you will learn
 
-You will learn how to build an [Azure Sphere](https://azure.microsoft.com/services/azure-sphere/?WT.mc_id=github-blog-dglover) application that integrates with [Azure IoT Central](https://azure.microsoft.com/services/iot-central/?WT.mc_id=github-blog-dglover). This includes support for displaying telemetry, controlling the device state using IoT Central *Settings* ([Azure IoT Hub Device Twins](https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-device-twins?WT.mc_id=github-blog-dglover)) and *Commands* ([Azure IoT Hub Direct Methods](https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-direct-methods?WT.mc_id=github-blog-dglover)), defining rules to trigger workflows, and a custom dashboard.
+You will learn how to build an [Azure Sphere](https://azure.microsoft.com/services/azure-sphere/?WT.mc_id=iot-0000-dglover) application that integrates with [Azure IoT Central](https://azure.microsoft.com/services/iot-central/?WT.mc_id=iot-0000-dglover). This includes support for displaying telemetry, controlling the device state using IoT Central *Settings* ([Azure IoT Hub Device Twins](https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins?WT.mc_id=iot-0000-dglover)) and *Commands* ([Azure IoT Hub Direct Methods](https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-direct-methods?WT.mc_id=iot-0000-dglover)), defining rules to trigger workflows, and a custom dashboard.
 
 If unfamiliar with Azure Sphere development then review the [Create a Secure Azure Sphere App using the Grove Shield Sensor Kit](https://github.com/gloveboxes/Create-a-Secure-Azure-Sphere-App-using-the-Grove-Shield-Sensor-Kit) tutorial before starting this tutorial.
 
@@ -38,7 +38,7 @@ As billions of new devices are connected, organizations need to secure them to h
 
 ### What is Azure IoT Central
 
-Azure IoT Central provides an easy way to connect, monitor and manage your Internet of Things (IoT) assets at scale. [Azure IoT Central](https://azure.microsoft.com/en-in/services/iot-central/?WT.mc_id=github-blog-dglover) is a hosted, extensible software as a service (SaaS) platform that simplifies the setup of your IoT solution and helps reduce the burden and costs of IoT management, operations, and development. Provide customers superior products and services while expanding your business possibilities.
+Azure IoT Central provides an easy way to connect, monitor and manage your Internet of Things (IoT) assets at scale. [Azure IoT Central](https://azure.microsoft.com/services/iot-central/?WT.mc_id=iot-0000-dglover) is a hosted, extensible software as a service (SaaS) platform that simplifies the setup of your IoT solution and helps reduce the burden and costs of IoT management, operations, and development. Provide customers superior products and services while expanding your business possibilities.
 
 ![Azure IoT Central](resources/azure-iot.png)
 
@@ -68,7 +68,7 @@ Azure IoT Central provides an easy way to connect, monitor and manage your Inter
 
 We are going to create an Azure IoT Central application, connect Azure IoT Central to an Azure Sphere Tenant, and finally create a device.
 
-1. Open the [Azure IoT Central](https://azure.microsoft.com/en-au/services/iot-central/?WT.mc_id=github-blog-dglover) in a new browser tab, then click **Getting started**.
+1. Open the [Azure IoT Central](https://azure.microsoft.com/services/iot-central/?WT.mc_id=iot-0000-dglover) in a new browser tab, then click **Getting started**.
 
 2. Next, you will need to sign with your **Microsoft** Personal, or Work, or School account. If you do not have a Microsoft account, then you can create one for free using the **Create one!** link.
 
@@ -162,7 +162,7 @@ Click **Publish** to activate the template, then click **Publish**.
 
 The Azure Sphere includes out of the box support for Azure IoT Hub and IoT Central.
 
-Follow the complete [Set up Azure IoT Central to work with Azure Sphere](https://docs.microsoft.com/en-us/azure-sphere/app-development/setup-iot-central?WT.mc_id=github-blog-dglover) guide.
+Follow the complete [Set up Azure IoT Central to work with Azure Sphere](https://docs.microsoft.com/azure-sphere/app-development/setup-iot-central?WT.mc_id=iot-0000-dglover) guide.
 
 In summary, you need to:
 
@@ -352,7 +352,7 @@ static int ReadTelemetry(char eventBuffer[], size_t len) {
 
 #### TwinCallback
 
-Handles [Azure IoT Hub Device Twins](https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-device-twins?WT.mc_id=github-blog-dglover).
+Handles [Azure IoT Hub Device Twins](https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins?WT.mc_id=iot-0000-dglover).
 
 In Azure IoT Central, Azure IoT Hub Device Twins are exposed in the user interface as *Settings*.
 
@@ -403,7 +403,7 @@ cleanup:
 
 #### AzureDirectMethodHandler
 
-Handles [Azure IoT Hub Direct Methods](https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-direct-methods?WT.mc_id=github-blog-dglover)
+Handles [Azure IoT Hub Direct Methods](https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-direct-methods?WT.mc_id=iot-0000-dglover)
 
 In Azure IoT Central, Azure IoT Hub Direct Methods are exposed in the user interface as *Commands*.
 
